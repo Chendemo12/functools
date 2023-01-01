@@ -3,7 +3,7 @@ package tcp
 import (
 	"encoding/binary"
 	"errors"
-	"gitlab.cowave.com/gogo/functools/helper"
+	"github.com/Chendemo12/functools/helper"
 	"net"
 	"strconv"
 )

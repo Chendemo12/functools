@@ -4,12 +4,10 @@ package httpc
 import (
 	"errors"
 	"fmt"
-	"gitlab.cowave.com/gogo/functools/helper"
-	"gitlab.cowave.com/gogo/functools/zaplog"
+	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/functools/zaplog"
 	"strings"
 	"time"
-
-	"github.com/imroc/req/v3"
 )
 
 // HttprError 'imroc/req/v3'定义的错误消息结构

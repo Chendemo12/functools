@@ -2,7 +2,7 @@ package example
 
 import (
 	"fmt"
-	"gitlab.cowave.com/gogo/functools/tcp"
+	"github.com/Chendemo12/functools/tcp"
 	"time"
 )
 

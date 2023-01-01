@@ -1,8 +1,8 @@
 package zaplog
 
 import (
+	"github.com/Chendemo12/functools/python"
 	"github.com/natefinch/lumberjack"
-	"gitlab.cowave.com/gogo/functools/python"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"

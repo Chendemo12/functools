@@ -2,8 +2,8 @@
 package cprint
 
 import (
-	"gitlab.cowave.com/gogo/functools/helper"
-	"gitlab.cowave.com/gogo/functools/python"
+	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/functools/python"
 	"os"
 )
 

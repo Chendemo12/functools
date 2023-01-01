@@ -2,7 +2,7 @@ package tcp
 
 import (
 	"errors"
-	"gitlab.cowave.com/gogo/functools/cprint"
+	"github.com/Chendemo12/functools/cprint"
 	"io"
 	"net"
 	"strconv"

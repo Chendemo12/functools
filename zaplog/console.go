@@ -2,9 +2,9 @@ package zaplog
 
 import (
 	"fmt"
-	"gitlab.cowave.com/gogo/functools/cprint"
-	"gitlab.cowave.com/gogo/functools/helper"
-	"gitlab.cowave.com/gogo/functools/python"
+	"github.com/Chendemo12/functools/cprint"
+	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/functools/python"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"

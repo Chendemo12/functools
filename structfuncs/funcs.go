@@ -3,7 +3,7 @@ package structfuncs
 
 import (
 	"errors"
-	"gitlab.cowave.com/gogo/functools/helper"
+	"github.com/Chendemo12/functools/helper"
 	"reflect"
 	"unicode"
 )

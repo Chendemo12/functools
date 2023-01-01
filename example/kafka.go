@@ -2,7 +2,7 @@ package example
 
 import (
 	"fmt"
-	"gitlab.cowave.com/gogo/functools/kafkac"
+	"github.com/Chendemo12/functools/kafkac"
 	"time"
 )
 

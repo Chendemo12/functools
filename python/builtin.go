@@ -2,8 +2,8 @@
 package python
 
 import (
-	"gitlab.cowave.com/gogo/functools/helper"
-	"gitlab.cowave.com/gogo/functools/types"
+	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/functools/types"
 	"reflect"
 	"strconv"
 )

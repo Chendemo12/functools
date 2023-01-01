@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"gitlab.cowave.com/gogo/functools/cprint"
+	"github.com/Chendemo12/functools/cprint"
 	"io"
 	"net"
 	"sync"
