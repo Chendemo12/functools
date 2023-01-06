@@ -42,9 +42,9 @@ func All(args ...bool) bool {
 //	struct -> StructName({json});
 //	error -> error.Error();
 //
-// @param   object       any   需要格式化显示的对象
-// @param   excludeName  bool  不显示对象名称,  针对struct有效
-// @return  string ObjectName(...)
+//	@param	object		any		需要格式化显示的对象
+//	@param	excludeName	bool	不显示对象名称,	针对struct有效
+//	@return	string ObjectName(...)
 func Repr(object any, excludeName ...bool) (message string) {
 	if object == nil {
 		message = ""
@@ -162,4 +162,18 @@ func Index[T comparable](s []T, x T) int {
 	}
 
 	return -1
+}
+
+// In 查找序列s内是否存在元素x
+//
+//	@param	s	[]T	查找序列
+//	@param	x	T	特定元素
+//	@return	bool true if s contains x, false otherwise
+func In[T comparable](s []T, x T) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == x {
+			return true
+		}
+	}
+	return false
 }

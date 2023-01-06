@@ -70,29 +70,60 @@ func CombineStrings(elems ...string) string {
 }
 
 // WordCapitalize 单词首字母大写
-// @param   word  string  单词
-// @return  string 首字母大写的单词
+//
+//	@param	word	string	单词
+//	@return	string 首字母大写的单词
 func WordCapitalize(word string) string {
 	return strings.ToUpper(word)[:1] + strings.ToLower(word[1:])
 }
 
 // Base64Encode base64编码
-// @param   data  []byte  字节流
-// @return  string base64字符串
+//
+//	@param	data	[]byte	字节流
+//	@return	string base64字符串
 func Base64Encode(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
 // Base64Decode base64解码
-// @param  data  string  base64字符串
+//
+//	@param	data	string	base64字符串
 func Base64Decode(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(data)
 }
 
+// MapToString 将字典转换成字符串显示
 func MapToString(object map[string]any) string {
 	if bytes, err := DefaultJsonMarshal(&object); err != nil {
 		return ""
 	} else {
 		return string(bytes)
+	}
+}
+
+// Has 查找序列s内是否存在元素x
+//
+//	@param	s	[]T	查找序列
+//	@param	x	T	特定元素
+//	@return	bool true if s contains x, false otherwise
+func Has[T comparable](s []T, x T) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == x {
+			return true
+		}
+	}
+	return false
+}
+
+// Reverse 数组倒序, 就地修改
+//
+//	@param	s	*[]T	需要倒序的序列
+func Reverse[T any](s *[]T) {
+	length := len(*s)
+	var temp T
+	for i := 0; i < length/2; i++ {
+		temp = (*s)[i]
+		(*s)[i] = (*s)[length-1-i]
+		(*s)[length-1-i] = temp
 	}
 }
