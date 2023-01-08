@@ -8,6 +8,8 @@ import (
 	"github.com/Chendemo12/functools/zaplog"
 	"strings"
 	"time"
+
+	"github.com/imroc/req/v3"
 )
 
 // HttprError 'imroc/req/v3'定义的错误消息结构

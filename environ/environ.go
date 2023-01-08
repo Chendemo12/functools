@@ -394,7 +394,7 @@ func parseLine(line string, envMap map[string]string) (key string, value string,
 	}
 
 	if len(splitString) != 2 {
-		err = errors.New("Can't separate key from value")
+		err = errors.New("can't separate key from value")
 		return
 	}
 
