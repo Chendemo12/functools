@@ -50,22 +50,22 @@ type FasterTcpsConfig struct {
 // ---------------------- 自定义处理方法 ----------------------
 
 type FasterServerHandler interface {
-	AcceptHandlerFunc(r *Remote)               // 当客户端连接时触发的操作,此协程应在连接关闭时主动退出，如需在此协程内向client发送消息，则必须通过调用Write/Drain实现
+	AcceptHandlerFunc(r *FasterRemote)         // 当客户端连接时触发的操作,此协程应在连接关闭时主动退出，如需在此协程内向client发送消息，则必须通过调用Write/Drain实现
 	Read(conn net.Conn, p []byte) (int, error) // 读取数据，允许自定义读取方法,
-	HandlerFunc(r *Remote)                     // 处理接收到的消息
-	ClosedHandlerFunc(r *Remote)               // 当连接断开时执行的方法
+	HandlerFunc(r *FasterRemote)               // 处理接收到的消息
+	ClosedHandlerFunc(r *FasterRemote)         // 当连接断开时执行的方法
 }
 type FasterMessageHandler struct{}
 
 // AcceptHandlerFunc 当客户端连接时触发的操作
-func (t *FasterMessageHandler) AcceptHandlerFunc(r *Remote) {
+func (t *FasterMessageHandler) AcceptHandlerFunc(r *FasterRemote) {
 	cprint.Green("welcome to the world: " + r.conn.RemoteAddr().String())
 	<-r.Ctx().Done()
 	return
 }
 
 // HandlerFunc 处理接收到的消息
-func (t *FasterMessageHandler) HandlerFunc(r *Remote) {
+func (t *FasterMessageHandler) HandlerFunc(r *FasterRemote) {
 	_, _ = r.Write(welcome)
 }
 
@@ -77,13 +77,13 @@ func (t *FasterMessageHandler) Read(conn net.Conn, p []byte) (int, error) {
 }
 
 // ClosedHandlerFunc 连接关闭时方法
-func (t *FasterMessageHandler) ClosedHandlerFunc(r *Remote) {
+func (t *FasterMessageHandler) ClosedHandlerFunc(r *FasterRemote) {
 	cprint.Green(r.conn.RemoteAddr().String() + "closed connection")
 }
 
 // ---------------------- 远端连接 ----------------------
 
-type Remote struct {
+type FasterRemote struct {
 	s        *FasterServer      // FasterServer
 	si       int                // 记录当前连接所处 FasterServer 连接池的下标
 	conn     net.Conn           // 远端链接对象，当此为nil时则表示此槽位空闲
@@ -99,7 +99,7 @@ type Remote struct {
 	cancel   context.CancelFunc //
 }
 
-func (r *Remote) init(s *FasterServer, index int) {
+func (r *FasterRemote) init(s *FasterServer, index int) {
 	r.s, r.si = s, index
 	r.ri, r.wi = r.HeaderLen(), r.HeaderLen() // 预留消息头位置
 	r.rwLock = &sync.RWMutex{}
@@ -111,7 +111,7 @@ func (r *Remote) init(s *FasterServer, index int) {
 	r.procC <- struct{}{} // 第一步为读操作
 }
 
-func (r *Remote) reset() *Remote {
+func (r *FasterRemote) reset() *FasterRemote {
 	r.ri, r.wi = r.HeaderLen(), r.HeaderLen() // 预留消息头位置
 	r.wBuf, r.rBuf = r.wBuf[:0], r.rBuf[:0]   // 清空数据但保持内存空间不变
 	if len(r.procC) == 0 {
@@ -125,7 +125,7 @@ func (r *Remote) reset() *Remote {
 }
 
 // close 主动关闭与客户端的连接
-func (r *Remote) close() error {
+func (r *FasterRemote) close() error {
 	r.reset() // 重置此连接
 	if r.conn != nil {
 		return r.conn.Close()
@@ -133,41 +133,41 @@ func (r *Remote) close() error {
 	return nil
 }
 
-func (r *Remote) Ctx() context.Context { return r.ctx }
+func (r *FasterRemote) Ctx() context.Context { return r.ctx }
 
 // RWLock 适用于发送数据时的读写锁
-func (r *Remote) RWLock() *sync.RWMutex { return r.rwLock }
+func (r *FasterRemote) RWLock() *sync.RWMutex { return r.rwLock }
 
 // HeaderLen 消息头长度
-func (r *Remote) HeaderLen() int { return int(r.s.headerLength) }
+func (r *FasterRemote) HeaderLen() int { return int(r.s.headerLength) }
 
 // HeaderByteOrder 消息头字节序
-func (r *Remote) HeaderByteOrder() string { return r.s.headerByteOrder }
+func (r *FasterRemote) HeaderByteOrder() string { return r.s.headerByteOrder }
 
 // Conn 获取远端连接对象
 // @return net.Conn 远端连接对象
-func (r *Remote) Conn() net.Conn { return r.conn }
+func (r *FasterRemote) Conn() net.Conn { return r.conn }
 
 // RemoteAddr 获取远端链接地址
 // @return net.Addr 远端链接地址
-func (r *Remote) RemoteAddr() net.Addr { return r.conn.RemoteAddr() }
+func (r *FasterRemote) RemoteAddr() net.Addr { return r.conn.RemoteAddr() }
 
 // Logger 获取日志配置
-func (r *Remote) Logger() LoggerIface { return r.s.logger }
+func (r *FasterRemote) Logger() LoggerIface { return r.s.logger }
 
-func (r *Remote) String() string {
+func (r *FasterRemote) String() string {
 	if r.ri == r.HeaderLen() {
 		return "<nil>"
 	}
 	return string(r.rBuf[r.HeaderLen():r.ri])
 }
 
-func (r *Remote) Cap() int { return defaultMemoryCap + r.HeaderLen() }
+func (r *FasterRemote) Cap() int { return defaultMemoryCap + r.HeaderLen() }
 
-func (r *Remote) Len() int { return r.ReadLen() }
+func (r *FasterRemote) Len() int { return r.ReadLen() }
 
 // ReadLen 获取接收数据的长度
-func (r *Remote) ReadLen() int {
+func (r *FasterRemote) ReadLen() int {
 	if r.ri >= r.Cap() {
 		return 0
 	}
@@ -175,7 +175,7 @@ func (r *Remote) ReadLen() int {
 }
 
 // UnreadLen 获取缓冲区内尚未被读取的数据长度
-func (r *Remote) UnreadLen() int {
+func (r *FasterRemote) UnreadLen() int {
 	if r.lastRead >= r.ri {
 		return 0
 	}
@@ -183,7 +183,7 @@ func (r *Remote) UnreadLen() int {
 }
 
 // Read 将缓冲区的数据读取到切片p内，并返回实际读取的数据长度，其效果等同于copy，不建议使用
-func (r *Remote) Read(p []byte) (int, error) {
+func (r *FasterRemote) Read(p []byte) (int, error) {
 	if r.UnreadLen() == 0 { // 没有数据可以读了
 		return 0, io.EOF
 	}
@@ -194,7 +194,7 @@ func (r *Remote) Read(p []byte) (int, error) {
 }
 
 // ReadTo 将从TCP中读取到的数据转写到w中
-func (r *Remote) ReadTo(w io.Writer) (int, error) {
+func (r *FasterRemote) ReadTo(w io.Writer) (int, error) {
 	if r.UnreadLen() == 0 {
 		return 0, io.EOF
 	}
@@ -207,15 +207,15 @@ func (r *Remote) ReadTo(w io.Writer) (int, error) {
 }
 
 // Copy 将缓冲区的数据拷贝到切片p内，并返回实际读取的数据长度
-func (r *Remote) Copy(p []byte) (int, error) { return r.Read(p) }
+func (r *FasterRemote) Copy(p []byte) (int, error) { return r.Read(p) }
 
 // Content 获取读到的字节流
-func (r *Remote) Content() []byte { return r.rBuf[r.lastRead:r.ri] }
+func (r *FasterRemote) Content() []byte { return r.rBuf[r.lastRead:r.ri] }
 
 // Write 将切片p中的内容追加到发数据缓冲区内，并返回追加的数据长度;
 // 若缓冲区大小不足以写入全部数据，则返回实际写入的数据长度，
 // 返回值err恒为nil
-func (r *Remote) Write(p []byte) (int, error) {
+func (r *FasterRemote) Write(p []byte) (int, error) {
 	r.rwLock.Lock() // 避免 ServerHandler.AcceptHandlerFunc 与 ServerHandler.HandlerFunc 并发操作
 	defer r.rwLock.Unlock()
 
@@ -230,7 +230,7 @@ func (r *Remote) Write(p []byte) (int, error) {
 }
 
 // WriteFrom 从 io.Reader 中读取数据并直接写入发数据缓冲区
-func (r *Remote) WriteFrom(re io.Reader) (int, error) {
+func (r *FasterRemote) WriteFrom(re io.Reader) (int, error) {
 	r.rwLock.Lock()
 	defer r.rwLock.Unlock()
 
@@ -249,7 +249,7 @@ func (r *Remote) WriteFrom(re io.Reader) (int, error) {
 // @param offset int64 相对偏移量
 // @param whence int 相对位置,取值有：0相对起始位置;1相对当前位置;2相对结束位置;
 // @return int64, error 修正后的相对偏移量，可能的错误
-func (r *Remote) WriteSeek(offset int64, whence int) (int64, error) {
+func (r *FasterRemote) WriteSeek(offset int64, whence int) (int64, error) {
 	r.rwLock.Lock()
 	defer r.rwLock.Unlock()
 
@@ -261,7 +261,7 @@ func (r *Remote) WriteSeek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		r.wi = defaultMemoryCap + int(offset)
 	default:
-		return 0, errors.New("tcps.Remote.WriteSeek: invalid whence")
+		return 0, errors.New("tcps.FasterRemote.WriteSeek: invalid whence")
 	}
 
 	if r.wi <= r.HeaderLen() {
@@ -274,7 +274,7 @@ func (r *Remote) WriteSeek(offset int64, whence int) (int64, error) {
 }
 
 // Drain 提交缓冲区内的数据到TCP客户端
-func (r *Remote) Drain() (int, error) {
+func (r *FasterRemote) Drain() (int, error) {
 	r.rwLock.Lock()
 	defer r.rwLock.Unlock()
 
@@ -299,6 +299,7 @@ func (r *Remote) Drain() (int, error) {
 
 // ---------------------- 服务端 ----------------------
 
+// FasterServer 性能更好的服务端实现 TODO：NotImplemented
 type FasterServer struct {
 	Host                string               // TCPs host, default="0.0.0.0"
 	Port                string               // TCPs port, default=8090
@@ -308,7 +309,7 @@ type FasterServer struct {
 	FasterServerHandler FasterServerHandler  //
 	logger              LoggerIface          //
 	listener            net.Listener         //
-	remotes             []*Remote            // 客户端连接
+	remotes             []*FasterRemote      // 客户端连接
 	isRunning           bool                 // 是否正在运行
 	lock                *sync.Mutex          // 连接建立和断开时加锁
 	ctx                 context.Context      //
@@ -321,21 +322,21 @@ func (s *FasterServer) init() *FasterServer {
 	s.ctx = context.Background()
 
 	// 初始化连接记录池
-	s.remotes = make([]*Remote, s.MaxOpenConn)
+	s.remotes = make([]*FasterRemote, s.MaxOpenConn)
 	// 初始化内存，以避免运行中的内存分配
 	small := preDistributionRemoteNums
 	if small > s.MaxOpenConn {
 		small = s.MaxOpenConn
 	}
 	for i := 0; i < small; i++ {
-		s.remotes[i] = &Remote{}
+		s.remotes[i] = &FasterRemote{}
 		s.remotes[i].init(s, i)
 	}
 
 	return s
 }
 
-func (s *FasterServer) read(r *Remote) error {
+func (s *FasterServer) read(r *FasterRemote) error {
 	if s.headerLength != 0 {
 		_, err := r.conn.Read(r.rBuf[:s.headerLength])
 		if err != nil {
@@ -435,7 +436,7 @@ func (s *FasterServer) Serve() error {
 		s.lock.Lock() // 建立连接时禁止并发
 		for i := 0; i < s.MaxOpenConn; i++ {
 			if s.remotes[i] == nil { // 此时连接槽未初始化
-				s.remotes[i] = &Remote{}
+				s.remotes[i] = &FasterRemote{}
 				s.remotes[i].init(s, i)
 			}
 
@@ -453,7 +454,7 @@ func (s *FasterServer) Serve() error {
 }
 
 // fasterProcess 处理TCP连接
-func fasterProcess(r *Remote) {
+func fasterProcess(r *FasterRemote) {
 	defer func() {
 		_ = r.close()
 		r.s.FasterServerHandler.ClosedHandlerFunc(r)

@@ -16,7 +16,7 @@ type FIface interface {
 	Debugf(format string, args ...any)
 }
 
-type AllIface interface {
+type AIface interface {
 	Iface
 	FIface
 }

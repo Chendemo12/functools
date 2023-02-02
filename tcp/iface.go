@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/Chendemo12/functools/helper"
+	"io"
 	"net"
 	"strconv"
 )
@@ -18,10 +19,10 @@ type LoggerIface interface {
 }
 
 type ServerHandler interface {
-	AcceptHandlerFunc(conn net.Conn) // 当客户端连接时触发的操作，如需在此协程内向client发送消息，则必须进行TCPMessage的封装，可通过调用SendMessageToClient()实现
-	HandlerFunc(msg *Frame) *Frame   // 处理接收到的消息
-	SendMessage(msg *Frame) error    // 主动向客户端发送消息，进行TCPMessage封装
-	ReadMessage(msg *Frame) error    // 读取数据，允许自定义读物方法
+	OnAccepted(r *Remote) error              // 当客户端连接时触发的操作，如需在此协程内向client发送消息，则必须进行TCPMessage的封装
+	OnClosed(r *Remote) error                // 当客户端断开连接时触发的操作
+	Handler(r *Remote) error                 // 处理接收到的消息
+	Read(conn net.Conn, buf io.Writer) error // 读取数据，允许自定义读取方法
 }
 
 type MessageIface interface {

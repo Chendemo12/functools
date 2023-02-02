@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.13 - (20230202)
+
+### Rename
+
+- `zaplog.AllIface` to `zaplog.AIface`;
+
 ## 0.1.12 - (20230108)
 
 ### Fix
