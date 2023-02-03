@@ -15,17 +15,16 @@ var bufLength = int(math.Pow(2, 16) + headerLength) //
 
 var welcome = []byte("i received your message")
 var empty = make([]byte, 0)
-var (
-	defaultsConfig = &TcpsConfig{
-		MessageHandler: &MessageHandler{},
-		Logger:         nil,
-		Host:           "0.0.0.0",
-		Port:           "8090",
-		MaxOpenConn:    5,
-		ByteOrder:      tcpByteOrder,
-	}
-)
+var defaultsConfig = &TcpsConfig{
+	MessageHandler: &MessageHandler{},
+	Logger:         nil,
+	Host:           "0.0.0.0",
+	Port:           "8090",
+	MaxOpenConn:    5,
+	ByteOrder:      tcpByteOrder,
+}
 
+// MessageHandler 客户端消息处理方法
 type MessageHandler struct{}
 
 // Handler 处理接收到的消息
@@ -163,8 +162,8 @@ func (r *Remote) Len() int {
 	}
 }
 
-// Send 将缓冲区的数据发生到服务端
-func (r *Remote) Send() (n int, err error) {
+// Drain 将缓冲区的数据发生到客户端
+func (r *Remote) Drain() (n int, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock() // 读写分离
 

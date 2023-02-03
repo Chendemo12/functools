@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/Chendemo12/functools/helper"
-	"io"
 	"net"
 	"strconv"
 )
@@ -19,10 +18,10 @@ type LoggerIface interface {
 }
 
 type ServerHandler interface {
-	OnAccepted(r *Remote) error              // 当客户端连接时触发的操作，如需在此协程内向client发送消息，则必须进行TCPMessage的封装
-	OnClosed(r *Remote) error                // 当客户端断开连接时触发的操作
-	Handler(r *Remote) error                 // 处理接收到的消息
-	Read(conn net.Conn, buf io.Writer) error // 读取数据，允许自定义读取方法
+	OnAccepted(r *Remote) error // 当客户端连接时触发的操作，如果此操作耗时较长,则应手动创建一个协程进行处理
+	OnClosed(r *Remote) error   // 当客户端断开连接时触发的操作, 此操作执行完成之后才会释放与 Remote 的连接
+	Handler(r *Remote) error    // 处理接收到的消息, 当 OnAccepted 处理完成时,会循环执行 Read -> Handler
+	//Read(conn net.Conn, buf io.Writer) error // 读取数据，允许自定义读取方法, 当此操作执行失败时,将主动关闭与 Remote 的连接
 }
 
 type MessageIface interface {
