@@ -2,45 +2,61 @@ package tcp
 
 import (
 	"errors"
-	"io"
 	"net"
-	"strconv"
+	"sync"
+	"time"
 )
 
 var defaultcConfig = &TcpcConfig{
-	Host:      "127.0.0.1",
-	Port:      8090,
-	ByteOrder: tcpByteOrder,
-	Logger:    nil,
+	Host:           "127.0.0.1",
+	Port:           "8090",
+	ByteOrder:      tcpByteOrder,
+	Logger:         NewDefaultLogger(),
+	Reconnect:      true,
+	ReconnectDelay: 2 * time.Second,
+	MessageHandler: &MessageHandler{logger: NewDefaultLogger()},
 }
 
 // TcpcConfig TCP客户端配置
 type TcpcConfig struct {
-	Host      string
-	Port      int
-	ByteOrder string
-	Logger    LoggerIface
+	Host           string        `description:"server host"`
+	Port           string        `description:"server port"`
+	ByteOrder      string        `description:"消息头长度字节序"`
+	Logger         LoggerIface   `description:"日志接口"`
+	Reconnect      bool          `description:"是否重连"`
+	ReconnectDelay time.Duration `description:"重连的等待间隔"`
+	MessageHandler ClientHandler
 }
 
 // Client TCP 客户端
 type Client struct {
-	logger          LoggerIface
-	client          net.Conn
-	receiverChannel chan *Frame // 从TCP收到的数据
-	senderChannel   chan *Frame // 需要发送到TCP的数据
-	Host            string
-	Port            int
-	ByteOrder       string
-	isRunning       bool
+	r              *Remote
+	handler        ClientHandler
+	reconnect      bool          `description:"是否重连"`
+	reconnectDelay time.Duration `description:"重连的等待间隔"`
+	isRunning      bool
 }
 
 // RemoteAddr 远端服务器地址
-func (c *Client) RemoteAddr() string {
-	if c.isRunning {
-		return c.client.RemoteAddr().String()
-	} else {
-		return ""
+func (c *Client) RemoteAddr() string  { return c.r.addr }
+func (c *Client) Logger() LoggerIface { return c.r.logger }
+func (c *Client) IsRunning() bool     { return c.isRunning }
+func (c *Client) Stop() error         { return c.r.Close() }
+
+// 连接远程服务
+func (c *Client) connect() error {
+	conn, err := net.Dial("tcp", c.RemoteAddr())
+	if err != nil {
+		return err
 	}
+	c.r.conn = conn
+
+	// 处理连接时任务
+	err = c.handler.OnAccepted(c.r)
+	if err != nil {
+		c.Logger().Error(c.RemoteAddr()+": error on accept, ", err.Error())
+	}
+	return nil
 }
 
 func (c *Client) Start() error {
@@ -48,102 +64,45 @@ func (c *Client) Start() error {
 		return errors.New("client is already running")
 	}
 
-	if c.ByteOrder == "" {
-		c.ByteOrder = tcpByteOrder
+	if c.handler == nil {
+		return errors.New("client MessageHandler is not define")
 	}
 
-	addr := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
+	// 初始化内存
+	c.r.rx = make([]byte, bufLength, bufLength)
+	c.r.tx = make([]byte, bufLength, bufLength)
+
+	if err := c.connect(); err != nil {
+		// 如果启动时就无法连接，则直接退出
 		return err
 	}
-	// 实例化通道
-	c.receiverChannel = make(chan *Frame, 20)
-	c.senderChannel = make(chan *Frame, 20)
-	// 记录连接
-	c.client = conn
 
-	msg := &Frame{Conn: conn, ByteOrder: c.ByteOrder}
-	go func() { // 发送消息
-		for msg := range c.senderChannel {
-			_, err := conn.Write(msg.Pack())
-			if err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF { // connection closed by server
-					break
-				} else {
-					c.logger.Warn("send message failed, ", err.Error(), c.RemoteAddr())
-				}
-			}
-		}
-	}()
+	c.isRunning = true // server is running
 
-	go func() {
-		defer func(conn net.Conn) {
-			if err := conn.Close(); err != nil {
-				c.logger.Warn("conn close failed: ", err.Error())
-				return
-			}
-		}(conn)
-
-		for {
-			// 接收数据
-			headerBuf := [2]byte{} // 消息头长2个字节
-			// 接收数据
-			if n, err := conn.Read(headerBuf[:]); err != nil {
-				if err != io.EOF {
-					c.logger.Warn("read from connect failed, ", err.Error())
-				}
+	for c.isRunning { // 处理通信中任务
+		err := c.r.readMessage()
+		if err != nil {
+			// 消息读取失败，重连
+			err = c.handler.OnClosed(c.r)
+			if !c.reconnect { // 设置了不重连，退出任务
 				break
-			} else {
-				if n < 2 {
-					c.logger.Warn("the message header is incomplete, ", c.RemoteAddr())
-					continue
-				}
-				// 获取消息长度
-				msg.Length = MessageHeaderUnpack(c.ByteOrder, headerBuf[:])
 			}
-
-			contentBuf := make([]byte, msg.Length)
-			if _, err := io.ReadFull(conn, contentBuf); err != nil {
-				if err != io.EOF {
-					c.logger.Warn("read from connect failed, ", err.Error(), c.RemoteAddr())
-				}
-				break
-			} // ReadFull 会把填充contentBuf填满为止
-
-			msg.Content = contentBuf // 获取消息体
-			c.receiverChannel <- msg
+			// 重连
+			time.Sleep(c.reconnectDelay)
+			err = c.connect()
 		}
-	}()
 
-	c.isRunning = true
+		//
+		// ******************** 处理过程 ********************
+		//
+		err = c.handler.Handler(c.r)
+		if err != nil {
+			c.Logger().Warn("handler failed, ", err.Error())
+			continue
+		}
+	}
+
 	return nil
-}
-
-func (c *Client) Stop() {
-	if c != nil && c.client != nil {
-		if err := c.client.Close(); err != nil {
-			c.logger.Warn("conn close failed: ", err.Error())
-			return
-		}
-	}
-}
-
-// Messages 获取收到的数据
-// # Usage：
-//
-//	for msg := range c.Messages() {
-//		fmt.Println(msg.String())
-//	}
-func (c *Client) Messages() <-chan *Frame { return c.receiverChannel }
-
-func (c *Client) WriteMessage(data []byte) error {
-	if c.isRunning {
-		msg := &Frame{Content: data, ByteOrder: c.ByteOrder}
-		c.senderChannel <- msg
-		return nil
-	}
-	return errors.New("client is not running")
 }
 
 // NewAsyncTcpClient 创建一个TCP客户端(非阻塞)
@@ -154,10 +113,10 @@ func (c *Client) WriteMessage(data []byte) error {
 //
 // # Usage:
 //
-//	c := client.NewAsyncTcpClient(&client.TcpcConfig{
+//	c := conn.NewAsyncTcpClient(&conn.TcpcConfig{
 //		Host:   "127.0.0.1",
 //		Port:   8090,
-//		ByteOrder: "big",
+//		byteOrder: "big",
 //		Logger: logger.ConsoleLogger{},
 //	})
 //
@@ -171,29 +130,52 @@ func (c *Client) WriteMessage(data []byte) error {
 //		fmt.Println("<== message sent successfully")
 //	}
 func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
-	var tc *Client
+	var client *Client
 
 	if len(c) == 0 {
-		tc = &Client{
-			Host:      defaultcConfig.Host,
-			Port:      defaultcConfig.Port,
-			ByteOrder: defaultcConfig.ByteOrder,
-			logger:    nil,
-			isRunning: false,
+		client = &Client{
+			r: &Remote{
+				addr:      net.JoinHostPort(defaultcConfig.Host, defaultcConfig.Port),
+				conn:      nil,
+				logger:    defaultsConfig.Logger,
+				byteOrder: defaultsConfig.ByteOrder,
+				rxEnd:     headerLength,
+				txEnd:     headerLength,
+				lock:      &sync.Mutex{},
+			},
+			handler:        defaultcConfig.MessageHandler,
+			reconnect:      defaultcConfig.Reconnect,
+			reconnectDelay: defaultcConfig.ReconnectDelay,
+			isRunning:      false,
 		}
 	} else {
-		tc = &Client{
-			Host:      c[0].Host,
-			Port:      c[0].Port,
-			ByteOrder: c[0].ByteOrder,
-			logger:    c[0].Logger,
+		client = &Client{
+			r: &Remote{
+				addr:      net.JoinHostPort(c[0].Host, c[0].Port),
+				conn:      nil,
+				logger:    c[0].Logger,
+				byteOrder: c[0].ByteOrder,
+				rxEnd:     headerLength,
+				txEnd:     headerLength,
+				lock:      &sync.Mutex{},
+			},
+			handler:        c[0].MessageHandler,
+			reconnect:      c[0].Reconnect,
+			reconnectDelay: c[0].ReconnectDelay,
 		}
+	}
+	if client.r.byteOrder == "" {
+		client.r.byteOrder = tcpByteOrder
+	}
+	if client.r.logger == nil {
+		client.r.logger = NewDefaultLogger()
 	}
 
 	go func() {
-		if err := tc.Start(); err != nil {
-			tc.logger.Error("connected failed: ", err.Error())
+		err := client.Start()
+		if err != nil {
+			client.r.logger.Error("connected failed: ", err.Error())
 		}
 	}()
-	return tc
+	return client
 }

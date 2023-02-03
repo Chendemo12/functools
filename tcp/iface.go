@@ -1,11 +1,7 @@
 package tcp
 
 import (
-	"encoding/binary"
-	"errors"
-	"github.com/Chendemo12/functools/helper"
-	"net"
-	"strconv"
+	"log"
 )
 
 // LoggerIface 自定义logger接口，log及zap等均已实现此接口
@@ -14,101 +10,27 @@ type LoggerIface interface {
 	Info(args ...any)
 	Warn(args ...any)
 	Error(args ...any)
-	Sync() error
 }
 
+// ServerHandler 服务端处理程序
 type ServerHandler interface {
 	OnAccepted(r *Remote) error // 当客户端连接时触发的操作，如果此操作耗时较长,则应手动创建一个协程进行处理
 	OnClosed(r *Remote) error   // 当客户端断开连接时触发的操作, 此操作执行完成之后才会释放与 Remote 的连接
-	Handler(r *Remote) error    // 处理接收到的消息, 当 OnAccepted 处理完成时,会循环执行 Read -> Handler
-	//Read(conn net.Conn, buf io.Writer) error // 读取数据，允许自定义读取方法, 当此操作执行失败时,将主动关闭与 Remote 的连接
+	Handler(r *Remote) error    // 处理接收到的消息, 当 OnAccepted 处理完成时,会循环执行 readMessage -> Handler
 }
 
-type MessageIface interface {
-	Pack() []byte             // 打包消息
-	Unpack(data []byte) error // 消息流解包
-	GetConn() net.Conn        // 获取对端连接
-	GetLength() uint16        // 获取消息长度
-	GetContent() []byte       // 获取消息体
-	String() string           // 转换消息为string类型
+// ClientHandler 客户端处理程序
+type ClientHandler interface {
+	ServerHandler
 }
 
-// MessageHeaderUnpack 解析消息头
-func MessageHeaderUnpack(order string, data []byte) uint16 {
-	if order == "little" {
-		return binary.LittleEndian.Uint16(data[:2])
-	}
-	return binary.BigEndian.Uint16(data[:2])
+type DefaultLogger struct {
+	logger *log.Logger
 }
 
-func MessageHeaderPack(order string, length uint16) []byte {
-	buf := make([]byte, 2)
-	if order == "little" {
-		binary.LittleEndian.PutUint16(buf, length)
-	} else {
-		binary.BigEndian.PutUint16(buf, length)
-	}
+func (l *DefaultLogger) Debug(args ...any) { l.logger.Panicln(args...) }
+func (l *DefaultLogger) Info(args ...any)  { l.logger.Panicln(args...) }
+func (l *DefaultLogger) Warn(args ...any)  { l.logger.Panicln(args...) }
+func (l *DefaultLogger) Error(args ...any) { l.logger.Panicln(args...) }
 
-	return buf
-}
-
-type Frame struct {
-	Conn      net.Conn // 对端连接
-	Content   []byte   // 消息内容
-	Length    uint16   // 消息长度
-	ByteOrder string   // 消息头字节序
-}
-
-func (m *Frame) Pack() []byte {
-	m.Length = uint16(len(m.Content))
-	lengthBuf := MessageHeaderPack(m.ByteOrder, m.Length)
-	buf := append(lengthBuf, m.Content...)
-	return buf
-}
-
-func (m *Frame) Unpack(data []byte) error {
-	if len(data) <= 2 {
-		return errors.New("the message Length is less than 2 bytes")
-	}
-	m.Length = MessageHeaderUnpack(m.ByteOrder, data[:2])
-	m.Content = data[2:]
-	return nil
-}
-
-// String 转换消息体为字符串形式
-func (m *Frame) String() string {
-	return string(m.Content)
-}
-
-// Map 转换为MAP
-func (m *Frame) Map() map[string]any {
-	js := make(map[string]any)
-	js["Length"] = m.Length
-	js["Content"] = m.Content
-	return js
-}
-
-// Repr 格式化输出
-func (m *Frame) Repr() string {
-	return helper.CombineStrings(
-		"Frame",
-		"({Length=", strconv.Itoa(int(m.Length)),
-		", Content=", helper.HexBeautify(m.Content),
-		")",
-	)
-}
-
-// Hex 十六进制显示消息体
-func (m *Frame) Hex() string {
-	if m.Length <= 2 {
-		return ""
-	}
-	return helper.HexBeautify(m.Content)
-}
-
-func (m *Frame) GetConn() net.Conn {
-	if m == nil {
-		return nil
-	}
-	return m.Conn
-}
+func NewDefaultLogger() *DefaultLogger { return &DefaultLogger{logger: log.Default()} }

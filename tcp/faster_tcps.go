@@ -525,9 +525,9 @@ func fasterProcess(r *FasterRemote) {
 //		&TcpsConfig{
 //			Host:           "0.0.0.0",
 //			Port:           8090,
-//			MaxOpenConn:    5,
+//			maxOpenConn:    5,
 //			FasterServerHandler: &TCPHandler{},
-//			ByteOrder:      "big",
+//			byteOrder:      "big",
 //			logger:         logger.ConsoleLogger{},
 //		},
 //	)
