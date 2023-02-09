@@ -18,6 +18,16 @@ const (
 	CRITICAL = zapcore.FatalLevel
 )
 
+const (
+	End   = "\u001B[0m"
+	EndLn = "\u001B[0m\n"
+	Ero   = "\u001B[31m"
+	Suc   = "\u001B[32m"
+	War   = "\u001B[33m"
+	Inf   = "\u001B[34m"
+	Deb   = "\u001B[35m" // 紫红色
+)
+
 var (
 	defaultConfig = &Config{
 		Filename:   "runtime",

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/Chendemo12/functools/cprint"
+	"github.com/Chendemo12/functools/logger"
 	"io"
 	"net"
 	"sync"
@@ -39,7 +40,7 @@ var (
 
 type FasterTcpsConfig struct {
 	ServerHandler *FasterMessageHandler
-	Logger        LoggerIface
+	Logger        logger.Iface
 	Host          string       `json:"tcps_host"`
 	Port          string       `json:"tcps_port"`
 	MaxOpenConn   int          `json:"max_open_conn"`
@@ -153,7 +154,7 @@ func (r *FasterRemote) Conn() net.Conn { return r.conn }
 func (r *FasterRemote) RemoteAddr() net.Addr { return r.conn.RemoteAddr() }
 
 // Logger 获取日志配置
-func (r *FasterRemote) Logger() LoggerIface { return r.s.logger }
+func (r *FasterRemote) Logger() logger.Iface { return r.s.logger }
 
 func (r *FasterRemote) String() string {
 	if r.ri == r.HeaderLen() {
@@ -216,7 +217,7 @@ func (r *FasterRemote) Content() []byte { return r.rBuf[r.lastRead:r.ri] }
 // 若缓冲区大小不足以写入全部数据，则返回实际写入的数据长度，
 // 返回值err恒为nil
 func (r *FasterRemote) Write(p []byte) (int, error) {
-	r.rwLock.Lock() // 避免 ServerHandler.AcceptHandlerFunc 与 ServerHandler.HandlerFunc 并发操作
+	r.rwLock.Lock() // 避免 HandlerFunc.AcceptHandlerFunc 与 HandlerFunc.HandlerFunc 并发操作
 	defer r.rwLock.Unlock()
 
 	i := 0
@@ -307,7 +308,7 @@ type FasterServer struct {
 	headerLength        HeaderLength         // TCP消息头长度，若为0则不包含消息头
 	headerByteOrder     string               // TCP消息头字节序，默认大端序，若 headerLength =0则无效
 	FasterServerHandler FasterServerHandler  //
-	logger              LoggerIface          //
+	logger              logger.Iface         //
 	listener            net.Listener         //
 	remotes             []*FasterRemote      // 客户端连接
 	isRunning           bool                 // 是否正在运行

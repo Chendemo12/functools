@@ -2,7 +2,6 @@ package zaplog
 
 import (
 	"fmt"
-	"github.com/Chendemo12/functools/cprint"
 	"github.com/Chendemo12/functools/helper"
 	"github.com/Chendemo12/functools/python"
 	"go.uber.org/zap"
@@ -53,23 +52,23 @@ type ConsoleLogger struct{}
 func (l ConsoleLogger) Sync() error { return nil }
 
 func (l ConsoleLogger) Debug(args ...any) {
-	console.Debug(helper.CombineStrings(cprint.Deb, fmt.Sprint(args...), cprint.End))
+	console.Debug(helper.CombineStrings(Deb, fmt.Sprint(args...), End))
 }
 
 func (l ConsoleLogger) Info(args ...any) {
-	console.Info(helper.CombineStrings(cprint.Inf, fmt.Sprint(args...), cprint.End))
+	console.Info(helper.CombineStrings(Inf, fmt.Sprint(args...), End))
 }
 
 func (l ConsoleLogger) Warn(args ...any) {
-	console.Warn(helper.CombineStrings(cprint.War, fmt.Sprint(args...), cprint.End))
+	console.Warn(helper.CombineStrings(War, fmt.Sprint(args...), End))
 }
 
 func (l ConsoleLogger) Error(args ...any) {
-	console.Error(helper.CombineStrings(cprint.Ero, fmt.Sprint(args...), cprint.End))
+	console.Error(helper.CombineStrings(Ero, fmt.Sprint(args...), End))
 }
 
 func (l ConsoleLogger) Succ(args ...any) {
-	console.Debug(helper.CombineStrings(cprint.Suc, fmt.Sprint(args...), cprint.End))
+	console.Debug(helper.CombineStrings(Suc, fmt.Sprint(args...), End))
 }
 
 func (l ConsoleLogger) Errorf(format string, v ...any) { l.SError(fmt.Errorf(format, v...).Error()) }
@@ -81,41 +80,41 @@ func (l ConsoleLogger) Debugf(format string, v ...any) { l.SDebug(fmt.Errorf(for
 // SDebug == only string is accepted, so it is faster than Debug
 
 func (l ConsoleLogger) SDebug(msg string) {
-	console.Debug(helper.CombineStrings(cprint.Deb, msg, cprint.End))
+	console.Debug(helper.CombineStrings(Deb, msg, End))
 }
 
 func (l ConsoleLogger) SInfo(msg string) {
-	console.Info(helper.CombineStrings(cprint.Inf, msg, cprint.End))
+	console.Info(helper.CombineStrings(Inf, msg, End))
 }
 
 func (l ConsoleLogger) SWarn(msg string) {
-	console.Warn(helper.CombineStrings(cprint.War, msg, cprint.End))
+	console.Warn(helper.CombineStrings(War, msg, End))
 }
 
 func (l ConsoleLogger) SError(msg string) {
-	console.Error(helper.CombineStrings(cprint.Ero, msg, cprint.End))
+	console.Error(helper.CombineStrings(Ero, msg, End))
 }
 
 func (l ConsoleLogger) SSucc(msg string) {
-	console.Debug(helper.CombineStrings(cprint.Suc, msg, cprint.End))
+	console.Debug(helper.CombineStrings(Suc, msg, End))
 }
 
 func (l ConsoleLogger) FDebug(message string, object any) {
-	console.Debug(helper.CombineStrings(cprint.Deb, message, python.Repr(object), cprint.End))
+	console.Debug(helper.CombineStrings(Deb, message, python.Repr(object), End))
 }
 
 func (l ConsoleLogger) FInfo(message string, object any) {
-	console.Info(helper.CombineStrings(cprint.Inf, message, python.Repr(object), cprint.End))
+	console.Info(helper.CombineStrings(Inf, message, python.Repr(object), End))
 }
 
 func (l ConsoleLogger) FWarn(message string, object any) {
-	console.Warn(helper.CombineStrings(cprint.War, message, python.Repr(object), cprint.End))
+	console.Warn(helper.CombineStrings(War, message, python.Repr(object), End))
 }
 
 func (l ConsoleLogger) FError(message string, object any) {
-	console.Error(helper.CombineStrings(cprint.Ero, message, python.Repr(object), cprint.End))
+	console.Error(helper.CombineStrings(Ero, message, python.Repr(object), End))
 }
 
 func (l ConsoleLogger) FSucc(message string, object any) {
-	console.Debug(helper.CombineStrings(cprint.Suc, message, python.Repr(object), cprint.End))
+	console.Debug(helper.CombineStrings(Suc, message, python.Repr(object), End))
 }

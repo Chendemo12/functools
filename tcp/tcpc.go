@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"errors"
+	"github.com/Chendemo12/functools/logger"
 	"net"
 	"sync"
 	"time"
@@ -11,10 +12,10 @@ var defaultcConfig = &TcpcConfig{
 	Host:           "127.0.0.1",
 	Port:           "8090",
 	ByteOrder:      tcpByteOrder,
-	Logger:         NewDefaultLogger(),
+	Logger:         logger.NewDefaultLogger(),
 	Reconnect:      true,
 	ReconnectDelay: 2 * time.Second,
-	MessageHandler: &MessageHandler{logger: NewDefaultLogger()},
+	MessageHandler: &MessageHandler{},
 }
 
 // TcpcConfig TCP客户端配置
@@ -22,26 +23,26 @@ type TcpcConfig struct {
 	Host           string        `description:"server host"`
 	Port           string        `description:"server port"`
 	ByteOrder      string        `description:"消息头长度字节序"`
-	Logger         LoggerIface   `description:"日志接口"`
+	Logger         logger.Iface  `description:"日志接口"`
 	Reconnect      bool          `description:"是否重连"`
 	ReconnectDelay time.Duration `description:"重连的等待间隔"`
-	MessageHandler ClientHandler
+	MessageHandler HandlerFunc
 }
 
 // Client TCP 客户端
 type Client struct {
 	r              *Remote
-	handler        ClientHandler
+	handler        HandlerFunc
 	reconnect      bool          `description:"是否重连"`
 	reconnectDelay time.Duration `description:"重连的等待间隔"`
 	isRunning      bool
 }
 
 // RemoteAddr 远端服务器地址
-func (c *Client) RemoteAddr() string  { return c.r.addr }
-func (c *Client) Logger() LoggerIface { return c.r.logger }
-func (c *Client) IsRunning() bool     { return c.isRunning }
-func (c *Client) Stop() error         { return c.r.Close() }
+func (c *Client) RemoteAddr() string   { return c.r.addr }
+func (c *Client) Logger() logger.Iface { return c.r.logger }
+func (c *Client) IsRunning() bool      { return c.isRunning }
+func (c *Client) Stop() error          { return c.r.Close() }
 
 // 连接远程服务
 func (c *Client) connect() error {
@@ -168,7 +169,7 @@ func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
 		client.r.byteOrder = tcpByteOrder
 	}
 	if client.r.logger == nil {
-		client.r.logger = NewDefaultLogger()
+		client.r.logger = logger.NewDefaultLogger()
 	}
 
 	go func() {

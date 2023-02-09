@@ -3,6 +3,7 @@ package tcp
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/Chendemo12/functools/logger"
 	"io"
 	"net"
 	"sync"
@@ -11,7 +12,7 @@ import (
 // Remote 对端链接
 type Remote struct {
 	conn      net.Conn
-	logger    LoggerIface
+	logger    logger.Iface
 	addr      string
 	byteOrder string
 	index     int    `description:"当前连接在Server中的位置"`
@@ -23,11 +24,15 @@ type Remote struct {
 	lock      *sync.Mutex
 }
 
-func (r *Remote) Addr() string        { return r.addr }
-func (r *Remote) String() string      { return r.Addr() }
-func (r *Remote) Logger() LoggerIface { return r.logger }
-func (r *Remote) Cap() int            { return bufLength - headerLength }
+func (r *Remote) Addr() string         { return r.addr }
+func (r *Remote) String() string       { return r.Addr() }
+func (r *Remote) Logger() logger.Iface { return r.logger }
+func (r *Remote) Cap() int             { return bufLength - headerLength }
 
+// IsConnected 是否已连接
+func (r *Remote) IsConnected() bool { return r.conn != nil }
+
+// Close 关闭与对端的连接
 func (r *Remote) Close() error {
 	if r.conn != nil {
 		return r.conn.Close()
@@ -40,11 +45,7 @@ func (r *Remote) Len() int {
 	if r.rxEnd == headerLength {
 		return 0
 	}
-	if r.byteOrder == "big" {
-		return int(binary.BigEndian.Uint16(r.rx[:headerLength]))
-	} else {
-		return int(binary.LittleEndian.Uint16(r.rx[:headerLength]))
-	}
+	return r.parseHeader()
 }
 
 // Read 将缓冲区的数据读取到切片buf内，并返回实际读取的数据长度
@@ -93,7 +94,7 @@ func (r *Remote) Unread() []byte {
 // Write 将切片buf中的内容追加到发数据缓冲区内，并返回追加的数据长度;
 // 若缓冲区大小不足以写入全部数据，则返回实际写入的数据长度和错误消息
 func (r *Remote) Write(buf []byte) (int, error) {
-	r.lock.Lock() // 避免 ServerHandler.OnAccepted 与 ServerHandler.Handler 并发操作
+	r.lock.Lock() // 避免 HandlerFunc.OnAccepted 与 HandlerFunc.HandlerFunc 并发操作
 	defer r.lock.Unlock()
 
 	i := copy(r.tx[r.txEnd:], buf)
@@ -143,8 +144,10 @@ func (r *Remote) Drain() error {
 	}
 
 	r.makeHeader() // 构造消息头
+	r.Logger().Error("client makeHeader: %d", r.txEnd)
 	i, err := r.conn.Write(r.tx[:r.txEnd])
 	r.txEnd -= i
+	r.Logger().Error("after client makeHeader: %d", r.txEnd)
 	return err
 }
 
@@ -152,6 +155,9 @@ func (r *Remote) reset() {
 	r.conn, r.addr = nil, ""
 	r.lastRead = headerLength
 	r.rxEnd, r.txEnd = headerLength, headerLength // 重置游标
+	for i := 0; i < headerLength; i++ {
+		r.rx[i] = 0
+	}
 }
 
 func (r *Remote) makeHeader() {
@@ -162,18 +168,27 @@ func (r *Remote) makeHeader() {
 	}
 }
 
+func (r *Remote) parseHeader() int {
+	if r.byteOrder == "big" {
+		return int(binary.BigEndian.Uint16(r.rx[:headerLength]))
+	} else {
+		return int(binary.LittleEndian.Uint16(r.rx[:headerLength]))
+	}
+}
+
 // 从 net.Conn 中读取数据到缓冲区内
 func (r *Remote) readMessage() error {
 	// 获取消息长度
-	n, err := r.conn.Read(r.rx[:headerLength])
+	n, err := r.conn.Read(r.rx[0:headerLength])
 	if err != nil {
 		return err
 	}
-	if n < headerLength {
+	if n != headerLength {
 		return errors.New("the message header is incomplete")
 	}
 	// 接收数据
-	n, err = io.ReadFull(r.conn, r.rx[headerLength:]) // ReadFull 会把填充buf填满为止
+	r.Logger().Debug("receive len: ", n, r.parseHeader())
+	n, err = io.ReadFull(r.conn, r.rx[headerLength:r.parseHeader()]) // ReadFull 会把填充buf填满为止
 	if err != nil {
 		return err
 	}

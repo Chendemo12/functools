@@ -27,6 +27,12 @@ var ( // 替换json标准库，提供更好的性能
 	DefaultJsonUnmarshal = DefaultJson.Unmarshal
 )
 
+//goland:noinspection GoUnusedGlobalVariable
+var (
+	F           = CombineStrings
+	StringsJoin = CombineStrings
+)
+
 // HexBeautify 格式化显示十六进制
 func HexBeautify(src []byte) string {
 	length := len(src)*3 + 1

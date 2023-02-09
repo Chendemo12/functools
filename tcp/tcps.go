@@ -2,6 +2,8 @@ package tcp
 
 import (
 	"errors"
+	"fmt"
+	"github.com/Chendemo12/functools/logger"
 	"math"
 	"net"
 	"sync"
@@ -15,7 +17,7 @@ var bufLength = int(math.Pow(2, 16) + headerLength) //
 var empty = make([]byte, 0)
 var welcome = []byte("i received your message")
 var defaultsConfig = &TcpsConfig{
-	MessageHandler: &MessageHandler{logger: NewDefaultLogger()},
+	MessageHandler: &MessageHandler{},
 	Logger:         nil,
 	Host:           "0.0.0.0",
 	Port:           "8090",
@@ -24,9 +26,7 @@ var defaultsConfig = &TcpsConfig{
 }
 
 // MessageHandler 客户端消息处理方法
-type MessageHandler struct {
-	logger LoggerIface
-}
+type MessageHandler struct{}
 
 // Handler 处理接收到的消息
 func (h *MessageHandler) Handler(r *Remote) error {
@@ -37,27 +37,27 @@ func (h *MessageHandler) Handler(r *Remote) error {
 
 // OnAccepted 当客户端连接时触发的操作
 func (h *MessageHandler) OnAccepted(r *Remote) error {
-	h.logger.Info("welcome to the world: ", r.Addr())
+	r.Logger().Info("welcome to the world: ", r.Addr())
 	return nil
 }
 
 // OnClosed 当客户端断开连接时触发的操作
 func (h *MessageHandler) OnClosed(r *Remote) error {
-	h.logger.Info("remote closed the connection: %v\n", r.Addr())
+	r.Logger().Info("remote closed the connection: ", r.Addr())
 	return nil
 }
 
 // Server tcp 服务端实现
 type Server struct {
-	handler     ServerHandler `description:"消息处理方法"`
-	logger      LoggerIface   `description:"日志"`
-	listener    net.Listener  `description:"listener"`
-	remotes     []*Remote     `description:"客户端连接"`
-	isRunning   bool          `description:"是否正在运行"`
-	lock        *sync.Mutex   `description:"连接建立和释放时加锁"`
-	addr        string        `description:"工作地址"`
-	maxOpenConn int           `description:"最大连接数量"`
-	byteOrder   string        `description:"消息长度字节序"`
+	handler     HandlerFunc  `description:"消息处理方法"`
+	logger      logger.Iface `description:"日志"`
+	listener    net.Listener `description:"listener"`
+	remotes     []*Remote    `description:"客户端连接"`
+	isRunning   bool         `description:"是否正在运行"`
+	lock        *sync.Mutex  `description:"连接建立和释放时加锁"`
+	addr        string       `description:"工作地址"`
+	maxOpenConn int          `description:"最大连接数量"`
+	byteOrder   string       `description:"消息长度字节序"`
 }
 
 // Addr 获取工作地址
@@ -78,11 +78,9 @@ func (s *Server) SetMaxOpenConn(num int) *Server {
 // @return  int 打开的连接数量
 func (s *Server) GetOpenConnNums() (v int) {
 	v = 0
-	if s != nil {
-		for i := 0; i < s.maxOpenConn; i++ {
-			if s.remotes[i] != nil {
-				v++
-			}
+	for i := 0; i < s.maxOpenConn; i++ {
+		if s.remotes[i].conn != nil {
+			v++
 		}
 	}
 
@@ -90,7 +88,7 @@ func (s *Server) GetOpenConnNums() (v int) {
 }
 
 // SetMessageHandler 设置消息处理钩子函数
-func (s *Server) SetMessageHandler(handler ServerHandler) *Server {
+func (s *Server) SetMessageHandler(handler HandlerFunc) *Server {
 	s.handler = handler
 	return s
 }
@@ -147,7 +145,9 @@ func (s *Server) Serve() error {
 		return err
 	}
 
-	s.logger.Info("server listening on: ", s.addr)
+	s.logger.Info(fmt.Sprintf(
+		"server listening on: %s, with maximum number of connections: %d", s.addr, s.maxOpenConn,
+	))
 	s.listener, s.isRunning = listener, true // 修改TCP运行状态
 
 	for s.isRunning {
@@ -173,7 +173,7 @@ func (s *Server) Serve() error {
 				break
 			}
 		} else { // 达到最大连接数量限制
-			s.logger.Warn("the connection number reached the upper limit, " + conn.RemoteAddr().String())
+			s.logger.Warn("the connection number reached the upper limit, closed: " + conn.RemoteAddr().String())
 			_ = conn.Close()
 		}
 
@@ -196,6 +196,7 @@ func (s *Server) process(r *Remote) {
 	}
 
 	for s.isRunning { // 处理通信中任务
+		s.logger.Warn("server read...")
 		err := r.readMessage()
 		if err != nil {
 			break
@@ -213,8 +214,8 @@ func (s *Server) process(r *Remote) {
 }
 
 type TcpsConfig struct {
-	MessageHandler ServerHandler
-	Logger         LoggerIface
+	MessageHandler HandlerFunc
+	Logger         logger.Iface
 	Host           string `json:"tcps_host"`
 	Port           string `json:"tcps_port"`
 	ByteOrder      string `json:"byte_order"`
@@ -226,20 +227,20 @@ type TcpsConfig struct {
 // TCP server 此处已做消息处理的解构，提供一个默认的消息处理方法；
 // 在实际的业务处理中，需要自定义一个struct，并实现ServerHandler的接口，
 // 当服务端接收到来自客户端的数据时，会首先创建ServerHandler.OnAccepted()协程，进行连接时任务处理；
-// 并在收到客户端消息时自动调用ServerHandler.Handler()方法来处理数据;
+// 并在收到客户端消息时自动调用ServerHandler.HandlerFunc()方法来处理数据;
 //
-// 若需返回数据到客户端，则ServerHandler.Handler()方法实现的返回值必须是TCPMessage{}的指针，若为nil则不发送数据。
+// 若需返回数据到客户端，则ServerHandler.HandlerFunc()方法实现的返回值必须是TCPMessage{}的指针，若为nil则不发送数据。
 // 因此为保证数据处理的完整性，建议将ServerHandler{}作为自定义struct的第一个匿名字段，并重写Handler()方法；
 //
 // # Usage
 //
 //	// 1. 首先创建一个自定义struct，并将ServerHandler作为第一个匿名字段：
 //	type TCPHandler struct {
-//		ServerHandler
+//		HandlerFunc
 //	}
 //
 //	// 2. 重写Handler(msg *Frame) *Frame()方法：
-//	func (h *TCPHandler) Handler(msg *Frame) *Frame {
+//	func (h *TCPHandler) HandlerFunc(msg *Frame) *Frame {
 //		fmt.Println(msg.Hex())
 //		return nil // 不返回任何数据
 //	}
@@ -282,7 +283,7 @@ func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
 	}
 
 	if s.logger == nil {
-		s.logger = NewDefaultLogger()
+		s.logger = logger.NewDefaultLogger()
 	}
 
 	if s.maxOpenConn == 0 {
