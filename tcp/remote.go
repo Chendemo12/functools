@@ -13,15 +13,15 @@ import (
 type Remote struct {
 	conn      net.Conn
 	logger    logger.Iface
+	lock      *sync.Mutex
 	addr      string
 	byteOrder string
+	rx        []byte `description:"接收缓冲区"`
+	tx        []byte `description:"发送缓冲区"`
 	index     int    `description:"当前连接在Server中的位置"`
 	lastRead  int    `description:"上一次读取的结束位置"`
 	rxEnd     int    `description:"接收到的数据结束位置"`
 	txEnd     int    `description:"待发送的数据结束位置"`
-	rx        []byte `description:"接收缓冲区"`
-	tx        []byte `description:"发送缓冲区"`
-	lock      *sync.Mutex
 }
 
 func (r *Remote) Addr() string         { return r.addr }
@@ -144,10 +144,8 @@ func (r *Remote) Drain() error {
 	}
 
 	r.makeHeader() // 构造消息头
-	r.Logger().Error("client makeHeader: %d", r.txEnd)
 	i, err := r.conn.Write(r.tx[:r.txEnd])
 	r.txEnd -= i
-	r.Logger().Error("after client makeHeader: %d", r.txEnd)
 	return err
 }
 
@@ -187,13 +185,13 @@ func (r *Remote) readMessage() error {
 		return errors.New("the message header is incomplete")
 	}
 	// 接收数据
-	r.Logger().Debug("receive len: ", n, r.parseHeader())
-	n, err = io.ReadFull(r.conn, r.rx[headerLength:r.parseHeader()]) // ReadFull 会把填充buf填满为止
+	n, err = io.ReadFull(r.conn, r.rx[headerLength:r.parseHeader()+2]) // ReadFull 会把填充buf填满为止
+
 	if err != nil {
 		return err
 	}
 	r.lastRead = headerLength // 游标重置
-	r.rxEnd += n
+	r.rxEnd = n + headerLength
 
 	return nil
 }

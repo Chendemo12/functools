@@ -20,21 +20,21 @@ var defaultcConfig = &TcpcConfig{
 
 // TcpcConfig TCP客户端配置
 type TcpcConfig struct {
+	Logger         logger.Iface `description:"日志接口"`
+	MessageHandler HandlerFunc
 	Host           string        `description:"server host"`
 	Port           string        `description:"server port"`
 	ByteOrder      string        `description:"消息头长度字节序"`
-	Logger         logger.Iface  `description:"日志接口"`
-	Reconnect      bool          `description:"是否重连"`
 	ReconnectDelay time.Duration `description:"重连的等待间隔"`
-	MessageHandler HandlerFunc
+	Reconnect      bool          `description:"是否重连"`
 }
 
 // Client TCP 客户端
 type Client struct {
-	r              *Remote
 	handler        HandlerFunc
-	reconnect      bool          `description:"是否重连"`
+	r              *Remote
 	reconnectDelay time.Duration `description:"重连的等待间隔"`
+	reconnect      bool          `description:"是否重连"`
 	isRunning      bool
 }
 

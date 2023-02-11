@@ -27,7 +27,7 @@ var (
 )
 
 // ViperParse viper解析方法
-// @param  filepath  string  配置文件路径
+//	@param	filepath	string	配置文件路径
 func ViperParse(conf any, filepath string) error {
 	cv := viper.New()
 	extension := "yaml"                                // 设置默认配置文件类型
@@ -55,8 +55,8 @@ func Environs() []string {
 }
 
 // DoesFileExists 判读一个文件是否存在
-// @param   path  string  文件路径
-// @return  bool 存在则为true
+//	@param	path	string	文件路径
+//	@return	bool 存在则为true
 func DoesFileExists(filepath string) bool {
 	if _, err := os.Stat(filepath); err != nil {
 		if os.IsNotExist(err) {
@@ -67,8 +67,8 @@ func DoesFileExists(filepath string) bool {
 }
 
 // LoadDotenv 从文件加载环境变量, 不覆盖系统环境变量
-// @param   filepath  string  环境变量文件路径
-// @return  error 如果文件不存在则返回错误
+//	@param	filepath	string	环境变量文件路径
+//	@return	error 如果文件不存在则返回错误
 func LoadDotenv(filepath string) error {
 	if !DoesFileExists(filepath) {
 		return errors.New("File does not exist: " + filepath)
@@ -81,10 +81,10 @@ func LoadDotenv(filepath string) error {
 }
 
 // AdvancedLoadDotenv 加载环境变量文件, 是 LoadDotenv 方法的增强版
-// @param   filepath  string     环境变量文件路径
-// @param   stream    io.Reader  IO读取接口
-// @param   override  bool       是否覆盖系统环境变量
-// @return  error 如果文件不存在则返回错误
+//	@param	filepath	string		环境变量文件路径
+//	@param	stream		io.Reader	IO读取接口
+//	@param	override	bool		是否覆盖系统环境变量
+//	@return	error 如果文件不存在则返回错误
 func AdvancedLoadDotenv(filepath string, stream io.Reader, override bool) error {
 	if filepath == "" && stream == nil {
 		return errors.New("stream is nil and File does not exist: " + filepath)

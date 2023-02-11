@@ -26,7 +26,7 @@ func Reflect(object any) (at reflect.Type, v reflect.Value, err error) {
 }
 
 // ToMap 转换struct为map (未优化)
-// @param  object  struct对象
+//	@param	object	struct对象
 func ToMap(object any) (map[string]any, error) {
 	mp := make(map[string]any)
 	bytes, err := helper.DefaultJsonMarshal(object)
@@ -112,8 +112,8 @@ func GetFieldsName(s any) []string {
 }
 
 // GetFieldsValue 获取struct的字段键值对
-// @param   s  any  struct  Object
-// @return  map[string]any {key: value}
+//	@param	s	any	struct	Object
+//	@return	map[string]any {key: value}
 func GetFieldsValue(s any) map[string]any {
 	var v reflect.Value
 	at := reflect.TypeOf(s)
@@ -211,8 +211,8 @@ func GetFieldsTags(s any) map[string]reflect.StructTag {
 }
 
 // GetFieldsType 获取struct的字段类型
-// @param   s  any  struct  Object
-// @return  map[string]any {key: type}
+//	@param	s	any	struct	Object
+//	@return	map[string]any {key: type}
 func GetFieldsType(s any) map[string]reflect.Kind {
 	var v reflect.Value
 	at := reflect.TypeOf(s)

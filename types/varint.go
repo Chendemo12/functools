@@ -28,7 +28,7 @@ func (pv *PyVarInt) GetBytes() []byte {
 }
 
 // Build 将一个int64类型的数字编码成不定长的字节串
-// @return  编码后的字节串
+//	@return	编码后的字节串
 func (pv *PyVarInt) Build() []byte {
 	acc := make([]byte, 8)
 	wri := binary.PutVarint(acc, pv.Value)
@@ -37,7 +37,7 @@ func (pv *PyVarInt) Build() []byte {
 }
 
 // Parse 解析一个不定长的字节串为int64数字
-// @return  解析后的数字、字节串的有效长度
+//	@return	解析后的数字、字节串的有效长度
 func (pv *PyVarInt) Parse(data []byte) (int64, int) {
 	pv.bytes = data
 	return binary.Varint(data)
@@ -57,7 +57,7 @@ func (pv *PyUVarInt) GetBytes() []byte {
 }
 
 // Build 将一个uint64类型的数字编码成不定长的字节串
-// @return  编码后的字节串
+//	@return	编码后的字节串
 func (pv *PyUVarInt) Build() []byte {
 	acc := make([]byte, 8)
 	wri := binary.PutUvarint(acc, pv.Value)
@@ -66,7 +66,7 @@ func (pv *PyUVarInt) Build() []byte {
 }
 
 // Parse 解析一个不定长的字节串为uint64数字
-// @return  解析后的数字、字节串的有效长度
+//	@return	解析后的数字、字节串的有效长度
 func (pv *PyUVarInt) Parse(data []byte) (uint64, int) {
 	pv.bytes = data
 	return binary.Uvarint(data)

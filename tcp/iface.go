@@ -1,5 +1,9 @@
 package tcp
 
+const tcpByteOrder = "big"
+const headerLength = 2        // 消息头长度
+const defaultMaxOpenConn = 10 //
+
 // HandlerFunc 消息处理程序
 type HandlerFunc interface {
 	OnAccepted(r *Remote) error // 当客户端连接时触发的操作，如果此操作耗时较长,则应手动创建一个协程进行处理

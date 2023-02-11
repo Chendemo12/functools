@@ -9,9 +9,6 @@ import (
 	"sync"
 )
 
-const headerLength = 2        // 消息头长度
-const defaultMaxOpenConn = 10 //
-
 var bufLength = int(math.Pow(2, 16) + headerLength) //
 
 var empty = make([]byte, 0)
@@ -52,12 +49,12 @@ type Server struct {
 	handler     HandlerFunc  `description:"消息处理方法"`
 	logger      logger.Iface `description:"日志"`
 	listener    net.Listener `description:"listener"`
-	remotes     []*Remote    `description:"客户端连接"`
-	isRunning   bool         `description:"是否正在运行"`
 	lock        *sync.Mutex  `description:"连接建立和释放时加锁"`
 	addr        string       `description:"工作地址"`
-	maxOpenConn int          `description:"最大连接数量"`
 	byteOrder   string       `description:"消息长度字节序"`
+	remotes     []*Remote    `description:"客户端连接"`
+	maxOpenConn int          `description:"最大连接数量"`
+	isRunning   bool         `description:"是否正在运行"`
 }
 
 // Addr 获取工作地址
@@ -68,14 +65,14 @@ func (s *Server) ByteOrder() string    { return s.byteOrder }
 func (s *Server) MaxOpenConnNums() int { return s.maxOpenConn }
 
 // SetMaxOpenConn 修改TCP的最大连接数量
-// @param  num  int  连接数量
+//	@param	num	int	连接数量
 func (s *Server) SetMaxOpenConn(num int) *Server {
 	s.maxOpenConn = num
 	return s
 }
 
 // GetOpenConnNums 获取当前TCP的连接数量
-// @return  int 打开的连接数量
+//	@return	int 打开的连接数量
 func (s *Server) GetOpenConnNums() (v int) {
 	v = 0
 	for i := 0; i < s.maxOpenConn; i++ {
@@ -173,7 +170,7 @@ func (s *Server) Serve() error {
 				break
 			}
 		} else { // 达到最大连接数量限制
-			s.logger.Warn("the connection number reached the upper limit, closed: " + conn.RemoteAddr().String())
+			s.logger.Warn("reached the upper limit, closed: " + conn.RemoteAddr().String())
 			_ = conn.Close()
 		}
 
@@ -196,7 +193,6 @@ func (s *Server) process(r *Remote) {
 	}
 
 	for s.isRunning { // 处理通信中任务
-		s.logger.Warn("server read...")
 		err := r.readMessage()
 		if err != nil {
 			break

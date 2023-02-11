@@ -9,10 +9,10 @@ import (
 )
 
 // NewRedis 创建一个Redis数据库连接
-// @param  host  string  主机地址
-// @param  port  int     端口
-// @param  pwd   string  数据库密码
-// @param  db    int     数据库编号
+//	@param	host	string	主机地址
+//	@param	port	int		端口
+//	@param	pwd		string	数据库密码
+//	@param	db		int		数据库编号
 func NewRedis(host string, port int, pwd string, db int) *redis.Client {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	rdb := redis.NewClient(&redis.Options{
@@ -25,8 +25,8 @@ func NewRedis(host string, port int, pwd string, db int) *redis.Client {
 }
 
 // NewDefaultRedis 创建一个默认的Redis数据库连接
-// @param  host  string  主机地址
-// @param  port  int     端口
+//	@param	host	string	主机地址
+//	@param	port	int		端口
 func NewDefaultRedis(host string, port int) *redis.Client {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	rdb := redis.NewClient(&redis.Options{
@@ -39,12 +39,12 @@ func NewDefaultRedis(host string, port int) *redis.Client {
 }
 
 // NewSentinelRedis 创建一个redis哨兵节点
-// @param   mastername   string    主节点名称
-// @param   password     string    主节点密码
-// @param   addrs        []string  集群地址
-// @param   db           int       数据库编号
-// @param   contextback  context.Context
-// @return  *redis.Client redis 客户端
+//	@param	mastername	string		主节点名称
+//	@param	password	string		主节点密码
+//	@param	addrs		[]string	集群地址
+//	@param	db			int			数据库编号
+//	@param	contextback	context.Context
+//	@return	*redis.Client redis 客户端
 func NewSentinelRedis(mastername, password string, addrs []string, db int, contextback context.Context) *redis.Client {
 	sf := &redis.FailoverOptions{
 		MasterName:    mastername,

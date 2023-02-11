@@ -135,7 +135,7 @@ func Reverse[T any](s *[]T) {
 }
 
 // IsEqual 判断2个切片是否相等
-// @return true if is equal
+//	@return	true if is equal
 func IsEqual[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false

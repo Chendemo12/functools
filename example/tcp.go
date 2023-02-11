@@ -2,8 +2,21 @@ package example
 
 import (
 	"github.com/Chendemo12/functools/tcp"
+	"github.com/Chendemo12/functools/zaplog"
 	"sync"
 	"time"
+)
+
+var (
+	//logger = zaplog.NewLogger(&zaplog.Config{
+	//	Filename:   "example",
+	//	Level:      zaplog.DEBUG,
+	//	Rotation:   2,
+	//	Retention:  3,
+	//	MaxBackups: 4,
+	//	Compress:   true,
+	//}).Sugar()
+	logger = zaplog.ConsoleLogger{}
 )
 
 type ServerHandler struct {
@@ -16,28 +29,16 @@ func (h *ServerHandler) OnAccepted(r *tcp.Remote) error {
 }
 
 func (h *ServerHandler) Handler(r *tcp.Remote) error {
-	r.Logger().Debug("receive message from: ", r.String())
+	r.Logger().Info("receive message from: ", r.String())
+	// Example 1
+	//return nil
+
+	// Example 2
 	_, err := r.Write([]byte("message received"))
 	err = r.Drain()
 	return err
-}
 
-//
-//func (h *ServerHandler) OnAccepted(r *tcp.Remote) error {
-//	go func() {
-//		for r.IsConnected() {
-//			_, err := r.Write([]byte(time.Now().String()))
-//			err = r.Drain()
-//			if err != nil {
-//				return
-//			}
-//
-//			time.Sleep(2 * time.Second)
-//		}
-//	}()
-//
-//	return nil
-//}
+}
 
 type ClientHandler struct {
 	tcp.MessageHandler
@@ -45,19 +46,25 @@ type ClientHandler struct {
 
 func (h *ClientHandler) OnAccepted(r *tcp.Remote) error {
 	r.Logger().Info("connect success")
-	go func() {
-		for r.IsConnected() {
-			r.Logger().Debug("sending...")
-			_, err := r.Write([]byte(time.Now().String()))
-			err = r.Drain()
-			if err != nil {
-				return
-			}
 
-			time.Sleep(2 * time.Second)
-		}
-	}()
-	return nil
+	// Example 2
+	//go func() {
+	//	for r.IsConnected() {
+	//		_, err := r.Write([]byte(time.Now().String()))
+	//		err = r.Drain()
+	//		if err != nil {
+	//			return
+	//		}
+	//
+	//		time.Sleep(2 * time.Second)
+	//	}
+	//}()
+	//return nil
+
+	// Example 2
+	_, err := r.Write([]byte(time.Now().String()))
+	err = r.Drain()
+	return err
 }
 
 func (h *ClientHandler) Handler(r *tcp.Remote) error {
@@ -65,6 +72,7 @@ func (h *ClientHandler) Handler(r *tcp.Remote) error {
 	_, err := r.Write([]byte(time.Now().String()))
 	err = r.Drain()
 	return err
+	//return nil
 }
 
 func (h *ClientHandler) OnClosed(r *tcp.Remote) error {
@@ -80,6 +88,7 @@ func Example_NewTcpServer() *tcp.Server {
 			ByteOrder:      "big",
 			MaxOpenConn:    5,
 			MessageHandler: &ServerHandler{},
+			Logger:         logger,
 		},
 	)
 }
@@ -90,6 +99,7 @@ func Example_NewAsyncTcpClient_1() {
 		Port:           "8090",
 		ByteOrder:      "big",
 		MessageHandler: &ClientHandler{},
+		Logger:         logger,
 	})
 }
 
@@ -99,6 +109,7 @@ func Example_NewAsyncTcpClient_2() {
 		Port:           "8090",
 		ByteOrder:      "big",
 		MessageHandler: &ClientHandler{},
+		Logger:         logger,
 	})
 }
 
@@ -112,6 +123,7 @@ func TestTcp() {
 
 	Example_NewAsyncTcpClient_1()
 
+	// Client 2
 	//go func() {
 	//	wg.Add(1)
 	//	Example_NewAsyncTcpClient_2()

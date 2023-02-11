@@ -90,8 +90,8 @@ func NewLogger(c ...*Config) *zap.Logger {
 }
 
 // GetLogger 依据文件名查询日志句柄
-// @param  filename  string  日志文件名
-// @param  deft      []bool  是否在未找到日志句柄时返回默认的日志句柄
+//	@param	filename	string	日志文件名
+//	@param	deft		[]bool	是否在未找到日志句柄时返回默认的日志句柄
 func GetLogger(filename string, deft ...bool) *zap.SugaredLogger {
 	// 首先判断是否已经存在此配置下的日志句柄
 	for i := 0; i < len(instances); i++ {

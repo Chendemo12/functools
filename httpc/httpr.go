@@ -68,7 +68,7 @@ type Httpr struct {
 }
 
 // makePrefix组合前缀，形如："http://127.0.0.1:3306/api/"
-// @param  prefix  string  地址前缀
+//	@param	prefix	string	地址前缀
 func (h *Httpr) makePrefix(prefix string) *Httpr {
 	// noinspection HttpUrlsUsage
 	h.prefix = helper.CombineStrings(
@@ -96,7 +96,7 @@ func (h *Httpr) init() *Httpr {
 }
 
 // SetTimeout 设置请求的超时时间，单位s
-// @param  timeout  int  超时时间(s)
+//	@param	timeout	int	超时时间(s)
 func (h *Httpr) SetTimeout(timeout int) *Httpr {
 	h.timeout = time.Duration(timeout) * time.Second
 	return h
@@ -109,7 +109,7 @@ func (h *Httpr) SetLogger(logger zaplog.Iface) *Httpr {
 }
 
 // SetUrlPrefix 设置地址前缀, 形如"/api"这样的路由前缀，以"/"开头并不以"/"结尾
-// @param  prefix  string  地址前缀
+//	@param	prefix	string	地址前缀
 func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 	// 重写现有的路由前缀
 	h.makePrefix(strings.TrimSuffix(prefix, "/"))
@@ -120,10 +120,10 @@ func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 }
 
 // DoRequest 发起网络请求
-// @param  method  string             请求方法，取值为GET/POST/PATCH/PUT/DELETE
-// @param  url     string             路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-// @param  query   map[string]string  查询参数map
-// @param  body    map[string]any     请求数据
+//	@param	method	string				请求方法，取值为GET/POST/PATCH/PUT/DELETE
+//	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
+//	@param	query	map[string]string	查询参数map
+//	@param	body	map[string]any		请求数据
 func (h *Httpr) DoRequest(method, url string, query map[string]string, body map[string]any) (*req.Response, error) {
 	request := h.client.R()
 	request.Error = &HttprError{} // SetError(), SetResult()方法均会增加1次反射调用
@@ -174,8 +174,8 @@ func (h *Httpr) NewDevClient() *Httpr {
 }
 
 // UnmarshalJson 将Http的返回体转换成结构体
-// @param  resp  *req.Response  Http返回体
-// @param  v     any            结果结构体指针
+//	@param	resp	*req.Response	Http返回体
+//	@param	v		any				结果结构体指针
 func (h *Httpr) UnmarshalJson(resp *req.Response, v any) error {
 	if resp.IsSuccess() {
 		if bytes, err := resp.ToBytes(); err != nil {
@@ -192,15 +192,15 @@ func (h *Httpr) UnmarshalJson(resp *req.Response, v any) error {
 }
 
 // Get 发起一个带查询参数的Get请求
-// @param  url    string             路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-// @param  query  map[string]string  查询参数map
+//	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
+//	@param	query	map[string]string	查询参数map
 func (h *Httpr) Get(url string, query map[string]string) (*req.Response, error) {
 	return h.DoRequest("GET", url, query, nil)
 }
 
 // Post 发起一个带请求体的Post请求
-// @param  url   string          路由地址
-// @param  body  map[string]any  请求数据  cannot  be  nil
+//	@param	url		string			路由地址
+//	@param	body	map[string]any	请求数据	cannot	be	nil
 func (h *Httpr) Post(url string, body map[string]any) (*req.Response, error) {
 	if body == nil {
 		return nil, errors.New("request body cannot be nil")
@@ -210,29 +210,29 @@ func (h *Httpr) Post(url string, body map[string]any) (*req.Response, error) {
 }
 
 // Put 发起一个带请求体的Put请求
-// @param  url   string          路由地址
-// @param  body  map[string]any  请求数据
+//	@param	url		string			路由地址
+//	@param	body	map[string]any	请求数据
 func (h *Httpr) Put(url string, body map[string]any) (*req.Response, error) {
 	return h.DoRequest("PUT", url, nil, body)
 }
 
 // Patch 发起一个带请求体的Patch请求
-// @param  url   string          路由地址
-// @param  body  map[string]any  请求数据
+//	@param	url		string			路由地址
+//	@param	body	map[string]any	请求数据
 func (h *Httpr) Patch(url string, body map[string]any) (*req.Response, error) {
 	return h.DoRequest("PATCH", url, nil, body)
 }
 
 // Delete  发起一个Delete请求
-// @param  url  string  路由地址
+//	@param	url	string	路由地址
 func (h *Httpr) Delete(url string) (*req.Response, error) {
 	return h.DoRequest("DELETE", url, nil, nil)
 }
 
 // PostWithQuery 发起一个带查询参数的Post请求
-// @param  url    string             路由地址
-// @param  query  map[string]string  查询参数map
-// @param  body   map[string]any     请求数据  cannot  be  nil
+//	@param	url		string				路由地址
+//	@param	query	map[string]string	查询参数map
+//	@param	body	map[string]any		请求数据	cannot	be	nil
 func (h *Httpr) PostWithQuery(url string, query map[string]string, body map[string]any) (*req.Response, error) {
 	if body == nil {
 		return nil, errors.New("body is nil")
@@ -242,24 +242,24 @@ func (h *Httpr) PostWithQuery(url string, query map[string]string, body map[stri
 }
 
 // DeleteWithQuery 发起一个带查询参数的Delete请求
-// @param  url    string             路由地址
-// @param  query  map[string]string  查询参数map
+//	@param	url		string				路由地址
+//	@param	query	map[string]string	查询参数map
 func (h *Httpr) DeleteWithQuery(url string, query map[string]string) (*req.Response, error) {
 	return h.DoRequest("DELETE", url, query, nil)
 }
 
 // PutWithQuery 发起一个带查询参数的Put请求
-// @param  url    string             路由地址
-// @param  query  map[string]string  查询参数map
-// @param  body   map[string]any     请求数据
+//	@param	url		string				路由地址
+//	@param	query	map[string]string	查询参数map
+//	@param	body	map[string]any		请求数据
 func (h *Httpr) PutWithQuery(url string, query map[string]string, body map[string]any) (*req.Response, error) {
 	return h.DoRequest("PUT", url, query, body)
 }
 
 // PatchWithQuery 发起一个带查询参数的Patch请求
-// @param  url    string             路由地址
-// @param  query  map[string]string  查询参数map
-// @param  body   map[string]any     请求数据
+//	@param	url		string				路由地址
+//	@param	query	map[string]string	查询参数map
+//	@param	body	map[string]any		请求数据
 func (h *Httpr) PatchWithQuery(url string, query map[string]string, body map[string]any) (*req.Response, error) {
 	return h.DoRequest("PATCH", url, query, body)
 }

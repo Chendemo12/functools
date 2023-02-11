@@ -163,9 +163,9 @@ func (k *KafkaClient) OpenProducerErrors() *KafkaClient {
 }
 
 // YieldMessage 生产一个Kafka消息对象，此方法会创建一个协程任务并立刻返回
-// @param  topic  string  目标主题
-// @param  key    []byte  键
-// @param  value  []byte  值
+//	@param	topic	string	目标主题
+//	@param	key		[]byte	键
+//	@param	value	[]byte	值
 func (k *KafkaClient) YieldMessage(topic string, key, value []byte) {
 	go func() {
 		k.senderChannel <- k.makeProducerMessage(topic, key, value)
@@ -173,17 +173,17 @@ func (k *KafkaClient) YieldMessage(topic string, key, value []byte) {
 }
 
 // SendMessage 生产一个Kafka消息对象，若通道已满，则会阻塞
-// @param  topic  string  目标主题
-// @param  key    []byte  键
-// @param  value  []byte  值
+//	@param	topic	string	目标主题
+//	@param	key		[]byte	键
+//	@param	value	[]byte	值
 func (k *KafkaClient) SendMessage(topic string, key, value []byte) {
 	k.senderChannel <- k.makeProducerMessage(topic, key, value)
 }
 
 // NewAsyncConsumer 启动一个消费者任务，此任务必须以goroutine形式运行，否则会阻塞
-// @param   topic    []string                           消费者Topics
-// @param   handler  func(msg *sarama.ConsumerMessage)  消息处理函数
-// @return  error 启动失败则返回错误原因，阻塞则成功
+//	@param	topic	[]string							消费者Topics
+//	@param	handler	func(msg *sarama.ConsumerMessage)	消息处理函数
+//	@return	error 启动失败则返回错误原因，阻塞则成功
 func (k *KafkaClient) NewAsyncConsumer(topics []string, handler func(msg *sarama.ConsumerMessage)) error {
 	if !k.inited {
 		k.initConfig()
@@ -205,7 +205,7 @@ func (k *KafkaClient) NewAsyncConsumer(topics []string, handler func(msg *sarama
 }
 
 // NewAsyncProducer 启动一个异步生产者任务，此任务必须以goroutine形式运行，否则会阻塞
-// @return  error 启动失败则返回错误原因，成功则未nil
+//	@return	error 启动失败则返回错误原因，成功则未nil
 func (k *KafkaClient) NewAsyncProducer() error {
 	if !k.inited {
 		k.initConfig()
@@ -272,7 +272,7 @@ func (k *KafkaClient) YieldProducerMessage(topic string, key, value []byte) {
 }
 
 // NewAsyncKafka 创建一个Kafka服务, 启动生产者协程，若Topics不为空则启动消费者协程
-// @return  *KafkaClient kafka客户端
+//	@return	*KafkaClient kafka客户端
 func NewAsyncKafka(conf *KafkaConfig) *KafkaClient {
 	kc := &KafkaClient{
 		Addrs:    conf.Addrs,
