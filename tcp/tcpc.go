@@ -172,6 +172,10 @@ func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
 		client.r.logger = logger.NewDefaultLogger()
 	}
 
+	if client.reconnectDelay == 0 {
+		client.reconnectDelay = 1 * time.Second
+	}
+
 	go func() {
 		err := client.Start()
 		if err != nil {

@@ -145,7 +145,9 @@ func (r *Remote) Drain() error {
 
 	r.makeHeader() // 构造消息头
 	i, err := r.conn.Write(r.tx[:r.txEnd])
-	r.txEnd -= i
+
+	r.txEnd -= i - headerLength // 重置消息头游标
+
 	return err
 }
 
