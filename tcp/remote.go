@@ -29,6 +29,9 @@ func (r *Remote) String() string       { return r.Addr() }
 func (r *Remote) Logger() logger.Iface { return r.logger }
 func (r *Remote) Cap() int             { return bufLength - headerLength }
 
+// Index 当前连接在 Server 中的位置, Client 无效
+func (r *Remote) Index() int { return r.index }
+
 // IsConnected 是否已连接
 func (r *Remote) IsConnected() bool { return r.conn != nil }
 
