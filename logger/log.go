@@ -3,6 +3,7 @@ package logger
 import (
 	"io"
 	"log"
+	"os"
 )
 
 // Iface 自定义logger接口，log及zap等均已实现此接口
@@ -29,8 +30,10 @@ func (l *DefaultLogger) Info(args ...any)  { l.logger.Println("\u001B[34mINFO\u0
 func (l *DefaultLogger) Warn(args ...any)  { l.logger.Println("\u001B[33mWARN\u001B[0m", args) }
 func (l *DefaultLogger) Error(args ...any) { l.logger.Println("\u001B[31mERROR\u001B[0m", args) }
 
-func NewDefaultLogger() *DefaultLogger { return &DefaultLogger{logger: log.Default()} }
-
 func NewLogger(out io.Writer, prefix string, flag int) *DefaultLogger {
 	return &DefaultLogger{logger: log.New(out, prefix, flag)}
+}
+
+func NewDefaultLogger() *DefaultLogger {
+	return NewLogger(os.Stderr, "", log.LstdFlags|log.Lshortfile)
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/Chendemo12/functools/logger"
 	"math"
 	"net"
+	"os/exec"
+	"runtime"
 	"sync"
 )
 
@@ -44,17 +46,84 @@ func (h *MessageHandler) OnClosed(r *Remote) error {
 	return nil
 }
 
+// ConnLimit 连接限制
+type ConnLimit struct {
+	num   int    `description:"最大连接数量"`
+	proto string `description:"协议类型"`
+	dport string `description:"目的端口"`
+	dst   string `description:"目标地址"`
+	src   string `description:"源地址"`
+}
+
+// Num 最大连接数
+func (l ConnLimit) Num() int { return l.num }
+
+// Input INPUT 限制命令
+func (l ConnLimit) Input() string {
+	return fmt.Sprintf(
+		"iptables -I INPUT -p %s --dport %s -m connlimit --connlimit-above %d -m state --state NEW -j DROP",
+		l.proto, l.dport, l.num,
+	)
+}
+
+// Output OUTPUT 限制命令
+func (l ConnLimit) Output() string {
+	// 插入到队头
+	return fmt.Sprintf(
+		"iptables -I OUTPUT -p %s --dport %s -m connlimit --connlimit-above %d -j DROP",
+		l.proto, l.dport, l.num,
+	)
+}
+
+func (l ConnLimit) InputWithSrc() string {
+	return fmt.Sprintf(
+		"iptables -I INPUT -p %s -s %s --dport %s -m connlimit --connlimit-above %d -j DROP",
+		l.proto, l.src, l.dport, l.num,
+	)
+}
+
+func (l ConnLimit) OutputWithSrc() string {
+	return fmt.Sprintf(
+		"iptables -I OUTPUT -p %s -s %s --dport %s -m connlimit --connlimit-above %d -j DROP",
+		l.proto, l.src, l.dport, l.num,
+	)
+}
+
+// Cmd 构建规则
+func (l ConnLimit) Cmd() *exec.Cmd {
+	cmd := exec.Command(
+		"iptables", "-I", "INPUT",
+		"-p", l.proto,
+		"--dport", l.dport,
+		"-m", "connlimit", "--connlimit-above", fmt.Sprintf("%d", l.num),
+		// "--connlimit-mask", "0", "-m", "state", "--state", "NEW",
+		"-j", "DROP",
+	)
+	return cmd
+}
+
+// Execute 执行命令
+func (l ConnLimit) Execute() error {
+	if runtime.GOOS != "windows" {
+		_, err := l.Cmd().Output()
+		return err
+	} else {
+		return errors.New("OS not supported")
+	}
+}
+
 // Server tcp 服务端实现
 type Server struct {
-	handler     HandlerFunc  `description:"消息处理方法"`
-	logger      logger.Iface `description:"日志"`
-	listener    net.Listener `description:"listener"`
-	lock        *sync.Mutex  `description:"连接建立和释放时加锁"`
-	addr        string       `description:"工作地址"`
-	byteOrder   string       `description:"消息长度字节序"`
-	remotes     []*Remote    `description:"客户端连接"`
-	maxOpenConn int          `description:"最大连接数量"`
-	isRunning   bool         `description:"是否正在运行"`
+	handler   HandlerFunc     `description:"消息处理方法"`
+	logger    logger.Iface    `description:"日志"`
+	listener  net.Listener    `description:"listener"`
+	lock      *sync.Mutex     `description:"连接建立和释放时加锁"`
+	wg        *sync.WaitGroup `description:"广播任务"`
+	addr      string          `description:"工作地址"`
+	byteOrder string          `description:"消息长度字节序"`
+	remotes   []*Remote       `description:"客户端连接"`
+	limit     *ConnLimit      `description:"连接限制"`
+	isRunning bool            `description:"是否正在运行"`
 }
 
 // Addr 获取工作地址
@@ -62,20 +131,22 @@ func (s *Server) Addr() string         { return s.addr }
 func (s *Server) String() string       { return s.Addr() }
 func (s *Server) IsRunning() bool      { return s.isRunning }
 func (s *Server) ByteOrder() string    { return s.byteOrder }
-func (s *Server) MaxOpenConnNums() int { return s.maxOpenConn }
+func (s *Server) MaxOpenConnNums() int { return s.limit.Num() }
 
 // SetMaxOpenConn 修改TCP的最大连接数量
+//
 //	@param	num	int	连接数量
 func (s *Server) SetMaxOpenConn(num int) *Server {
-	s.maxOpenConn = num
+	s.limit.num = num
 	return s
 }
 
 // GetOpenConnNums 获取当前TCP的连接数量
+//
 //	@return	int 打开的连接数量
 func (s *Server) GetOpenConnNums() (v int) {
 	v = 0
-	for i := 0; i < s.maxOpenConn; i++ {
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
 		if s.remotes[i].conn != nil {
 			v++
 		}
@@ -90,6 +161,38 @@ func (s *Server) SetMessageHandler(handler HandlerFunc) *Server {
 	return s
 }
 
+// Broadcast 将数据广播到所有客户端连接
+//
+//	@return int 发送成功的客户端数量
+func (s *Server) Broadcast(msg []byte) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	num := 0
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
+		r := s.remotes[i]
+		if !r.IsConnected() {
+			continue
+		}
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			_, err := r.Write(msg)
+			if err != nil {
+				return
+			}
+
+			if r.Drain() != nil {
+				return
+			}
+			num += 1
+		}()
+
+	}
+	s.wg.Wait()
+	return num
+}
+
 // Stop 停止并关闭全部TCP连接
 func (s *Server) Stop() {
 	if !s.IsRunning() { // 服务未启动
@@ -97,7 +200,7 @@ func (s *Server) Stop() {
 	}
 
 	// 逐个关闭客户端连接
-	for i := 0; i < s.maxOpenConn; i++ {
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
 		if s.remotes[i] != nil {
 			_ = s.remotes[i].Close()
 		}
@@ -120,8 +223,8 @@ func (s *Server) Serve() error {
 		return errors.New("server MessageHandler is not define")
 	}
 	// 初始化连接记录池
-	s.remotes = make([]*Remote, s.maxOpenConn)
-	for i := 0; i < s.maxOpenConn; i++ {
+	s.remotes = make([]*Remote, s.MaxOpenConnNums())
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
 		s.remotes[i] = &Remote{
 			index:     i,
 			conn:      nil,
@@ -136,6 +239,12 @@ func (s *Server) Serve() error {
 		}
 	}
 
+	err := s.limit.Execute() // 设置限制
+	if err != nil {
+		s.logger.Warn(err.Error())
+	} else {
+		s.logger.Info("iptables limit exceeded")
+	}
 	// 使用 net.Listen 监听连接的地址与端口
 	listener, err := net.Listen("tcp", s.addr)
 	if err != nil {
@@ -143,7 +252,7 @@ func (s *Server) Serve() error {
 	}
 
 	s.logger.Info(fmt.Sprintf(
-		"server listening on: %s, with maximum number of connections: %d", s.addr, s.maxOpenConn,
+		"server listening on: %s, with maximum number of connections: %d", s.addr, s.MaxOpenConnNums(),
 	))
 	s.listener, s.isRunning = listener, true // 修改TCP运行状态
 
@@ -155,8 +264,8 @@ func (s *Server) Serve() error {
 
 		s.lock.Lock() // 建立连接时禁止并发
 
-		if s.GetOpenConnNums() < s.maxOpenConn { // 为客户端建立连接, 此时一定存在空闲槽位
-			for i := 0; i < s.maxOpenConn; i++ {
+		if s.GetOpenConnNums() < s.MaxOpenConnNums() { // 为客户端建立连接, 此时一定存在空闲槽位
+			for i := 0; i < s.MaxOpenConnNums(); i++ {
 				remote := s.remotes[i]
 				if remote.conn != nil {
 					continue
@@ -257,22 +366,34 @@ func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
 
 	if len(c) == 0 {
 		s = &Server{
-			maxOpenConn: defaultsConfig.MaxOpenConn,
-			byteOrder:   defaultsConfig.ByteOrder,
-			handler:     defaultsConfig.MessageHandler,
-			logger:      defaultsConfig.Logger,
-			addr:        net.JoinHostPort(defaultsConfig.Host, defaultsConfig.Port),
+			byteOrder: defaultsConfig.ByteOrder,
+			handler:   defaultsConfig.MessageHandler,
+			logger:    defaultsConfig.Logger,
+			addr:      net.JoinHostPort(defaultsConfig.Host, defaultsConfig.Port),
+			limit: &ConnLimit{
+				num:   defaultsConfig.MaxOpenConn,
+				proto: "tcp",
+				dport: defaultsConfig.Port,
+				dst:   "",
+				src:   "",
+			},
 		}
 	} else {
 		s = &Server{
-			maxOpenConn: c[0].MaxOpenConn,
-			byteOrder:   c[0].ByteOrder,
-			handler:     c[0].MessageHandler,
-			logger:      c[0].Logger,
-			addr:        net.JoinHostPort(c[0].Host, c[0].Port),
+			byteOrder: c[0].ByteOrder,
+			handler:   c[0].MessageHandler,
+			logger:    c[0].Logger,
+			addr:      net.JoinHostPort(c[0].Host, c[0].Port),
+			limit: &ConnLimit{
+				num:   c[0].MaxOpenConn,
+				proto: "tcp",
+				dport: c[0].Port,
+				dst:   "",
+				src:   "",
+			},
 		}
 	}
-	s.lock = &sync.Mutex{}
+	s.lock, s.wg = &sync.Mutex{}, &sync.WaitGroup{}
 
 	if s.byteOrder == "" { // 默认大端字节序
 		s.byteOrder = tcpByteOrder
@@ -282,8 +403,8 @@ func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
 		s.logger = logger.NewDefaultLogger()
 	}
 
-	if s.maxOpenConn == 0 {
-		s.maxOpenConn = defaultMaxOpenConn
+	if s.MaxOpenConnNums() == 0 {
+		s.SetMaxOpenConn(defaultMaxOpenConn)
 	}
 
 	go func() {
