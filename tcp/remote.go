@@ -86,7 +86,7 @@ func (r *Remote) Content() []byte {
 	if r.rxEnd == headerLength {
 		return empty
 	}
-	return r.rx[headerLength : r.rxEnd+1]
+	return r.rx[headerLength:r.rxEnd]
 }
 
 // Unread 获取未读取的消息流

@@ -55,6 +55,14 @@ type ConnLimit struct {
 	src   string `description:"源地址"`
 }
 
+func (l ConnLimit) String() string {
+	if l.src != "" {
+		return l.InputWithSrc()
+	} else {
+		return l.Input()
+	}
+}
+
 // Num 最大连接数
 func (l ConnLimit) Num() int { return l.num }
 
@@ -239,12 +247,15 @@ func (s *Server) Serve() error {
 		}
 	}
 
-	err := s.limit.Execute() // 设置限制
+	// 设置限制
+	s.logger.Info("limit cmd: " + s.limit.String())
+	err := s.limit.Execute()
 	if err != nil {
-		s.logger.Warn(err.Error())
+		s.logger.Warn("executed failed, err: " + err.Error())
 	} else {
-		s.logger.Info("iptables limit exceeded")
+		s.logger.Info("iptables limit executed successfully")
 	}
+
 	// 使用 net.Listen 监听连接的地址与端口
 	listener, err := net.Listen("tcp", s.addr)
 	if err != nil {

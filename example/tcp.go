@@ -30,13 +30,14 @@ func (h *ServerHandler) OnAccepted(r *tcp.Remote) error {
 
 func (h *ServerHandler) Handler(r *tcp.Remote) error {
 	r.Logger().Info("receive message from: ", r.String())
+	r.Logger().Debug(r.Content())
 	// Example 1
-	//return nil
+	return nil
 
 	// Example 2
-	_, err := r.Write([]byte("message received"))
-	err = r.Drain()
-	return err
+	//_, err := r.Write([]byte("message received"))
+	//err = r.Drain()
+	//return err
 
 }
 
@@ -62,8 +63,10 @@ func (h *ClientHandler) OnAccepted(r *tcp.Remote) error {
 	//return nil
 
 	// Example 2
-	_, err := r.Write([]byte(time.Now().String()))
+	b := []byte(time.Now().String())
+	_, err := r.Write(b)
 	err = r.Drain()
+	r.Logger().Info(b)
 	return err
 }
 
