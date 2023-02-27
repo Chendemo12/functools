@@ -1,22 +1,24 @@
 package example
 
 import (
+	llog "github.com/Chendemo12/functools/logger"
 	"github.com/Chendemo12/functools/tcp"
-	"github.com/Chendemo12/functools/zaplog"
 	"sync"
 	"time"
 )
 
 var (
-	//logger = zaplog.NewLogger(&zaplog.Config{
-	//	Filename:   "example",
-	//	Level:      zaplog.DEBUG,
-	//	Rotation:   2,
-	//	Retention:  3,
-	//	MaxBackups: 4,
-	//	Compress:   true,
-	//}).Sugar()
-	logger = zaplog.ConsoleLogger{}
+	//	logger = zaplog.NewLogger(&zaplog.Config{
+	//		Filename:   "example",
+	//		Level:      zaplog.DEBUG,
+	//		Rotation:   2,
+	//		Retention:  3,
+	//		MaxBackups: 4,
+	//		Compress:   true,
+	//	}).Sugar()
+	//
+	// logger = zaplog.ConsoleLogger{}
+	logger = llog.NewDefaultLogger()
 )
 
 type ServerHandler struct {

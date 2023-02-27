@@ -8,22 +8,32 @@ import (
 )
 
 const (
-	End   = "\u001B[0m"
-	EndLn = "\u001B[0m\n"
-	Ero   = "\u001B[31m"
-	Suc   = "\u001B[32m"
-	War   = "\u001B[33m"
-	Inf   = "\u001B[34m"
-	Deb   = "\u001B[35m" // 紫红色
+	End     = "\u001B[0m"
+	EndLn   = "\u001B[0m\n"
+	red     = "\u001B[31m"
+	green   = "\u001B[32m"
+	yellow  = "\u001B[33m"
+	blue    = "\u001B[34m"
+	fuchsia = "\u001B[35m" // 紫红色
 )
 
-func White(message string)  { _, _ = os.Stdout.WriteString(message + "\n") }
-func Blue(message string)   { _, _ = os.Stdout.WriteString(helper.CombineStrings(Inf, message, EndLn)) }
-func Red(message string)    { _, _ = os.Stderr.WriteString(helper.CombineStrings(Ero, message, EndLn)) }
-func Yellow(message string) { _, _ = os.Stderr.WriteString(helper.CombineStrings(War, message, EndLn)) }
-func Green(message string)  { _, _ = os.Stdout.WriteString(helper.CombineStrings(Suc, message, EndLn)) }
+func White(message string) {
+	_, _ = os.Stdout.WriteString(message + "\n")
+}
+func Blue(message string) {
+	_, _ = os.Stdout.WriteString(helper.CombineStrings(blue, message, EndLn))
+}
+func Red(message string) {
+	_, _ = os.Stderr.WriteString(helper.CombineStrings(red, message, EndLn))
+}
+func Yellow(message string) {
+	_, _ = os.Stderr.WriteString(helper.CombineStrings(yellow, message, EndLn))
+}
+func Green(message string) {
+	_, _ = os.Stdout.WriteString(helper.CombineStrings(green, message, EndLn))
+}
 func Fuchsia(message string) {
-	_, _ = os.Stdout.WriteString(helper.CombineStrings(Deb, message, EndLn))
+	_, _ = os.Stdout.WriteString(helper.CombineStrings(fuchsia, message, EndLn))
 }
 
 func FWhite(message string, object any)  { White(helper.CombineStrings(message, python.Repr(object))) }

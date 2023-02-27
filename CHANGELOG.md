@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.19 - (20230227)
+
+### Refactor
+
+- 修改`logger.DefaultLogger`实现;
+
 ## 0.1.18 - (20230221)
 
 ### Feat
