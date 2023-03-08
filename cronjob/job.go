@@ -120,6 +120,11 @@ type Scheduler struct {
 	msgDisabled bool
 }
 
+func (s *Scheduler) SetLogger(logger logger.Iface) *Scheduler {
+	s.logger = logger
+	return s
+}
+
 // DisableMsg 禁用内部日志输出
 func (s *Scheduler) DisableMsg() *Scheduler {
 	s.msgDisabled = true
@@ -159,6 +164,8 @@ func (s *Scheduler) Add(jobs ...CronJob) *Scheduler { return s.AddCronjob(jobs..
 func (s *Scheduler) Run() {
 	for i := 0; i < len(s.schedules); i++ {
 		s.schedules[i].msgDisabled = s.msgDisabled // 使之后的修改生效
+		s.schedules[i].logger = s.logger
+
 		if !s.msgDisabled {
 			s.logger.Debug(fmt.Sprintf("Cronjob: '%s' started.", s.schedules[i].String()))
 		}
@@ -169,9 +176,9 @@ func (s *Scheduler) Run() {
 func (s *Scheduler) Done() <-chan struct{} { return s.ctx.Done() }
 
 // NewScheduler 创建一个任务调度器
-// @param ctx context.Context 根Context
-// @param lg logger.Iface 可选的日志句柄
-// @return scheduler 任务调度器
+//	@param	ctx	context.Context	根Context
+//	@param	lg	logger.Iface	可选的日志句柄
+//	@return	scheduler 任务调度器
 //
 //	# Usage
 //	// 首先创建一个根 Context

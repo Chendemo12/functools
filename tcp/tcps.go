@@ -171,7 +171,7 @@ func (s *Server) SetMessageHandler(handler HandlerFunc) *Server {
 
 // Broadcast 将数据广播到所有客户端连接
 //
-//	@return int 发送成功的客户端数量
+//	@return	int 发送成功的客户端数量
 func (s *Server) Broadcast(msg []byte) int {
 	s.lock.Lock()
 	defer s.lock.Unlock()
