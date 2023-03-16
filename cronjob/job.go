@@ -17,7 +17,7 @@ type CronJob interface {
 	Do(ctx context.Context) error
 	// WhenError 当 Do 执行失败时触发的回调, 若 Do 执行失败且超时, 则 WhenError 和 WhenTimeout
 	// 将同时被执行
-	WhenError()
+	WhenError(errs ...error)
 	// WhenTimeout 当定时任务未在规定时间内执行完毕时触发的回调, 当上一次 Do 执行超时时, 此 WhenTimeout 将和
 	// Do 同时执行, 即 Do 和 WhenError 在同一个由 WhenTimeout 创建的子协程内。
 	WhenTimeout()
@@ -43,7 +43,7 @@ func (c *Func) WhenTimeout() {
 }
 
 // WhenError 当 Do 执行失败时触发的回调
-func (c *Func) WhenError() {
+func (c *Func) WhenError(errs ...error) {
 	return
 }
 
@@ -79,7 +79,7 @@ func (s *Schedule) Do() {
 
 		if err != nil { // 此次任务执行发生错误
 			s.output(s.logger.Warn, fmt.Sprintf("'%s' error occur: %s", s.job.String(), err.Error()))
-			s.job.WhenError()
+			s.job.WhenError(err)
 		}
 	}()
 
@@ -176,6 +176,7 @@ func (s *Scheduler) Run() {
 func (s *Scheduler) Done() <-chan struct{} { return s.ctx.Done() }
 
 // NewScheduler 创建一个任务调度器
+//
 //	@param	ctx	context.Context	根Context
 //	@param	lg	logger.Iface	可选的日志句柄
 //	@return	scheduler 任务调度器

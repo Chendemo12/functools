@@ -1,0 +1,110 @@
+2023/03/16 11:45:15	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:45:15	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:45:16	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:45:17	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:45:17	[34mINFO[0m	example/sched.go:40	time interval:1.000054761s
+2023/03/16 11:45:18	[34mINFO[0m	example/sched.go:40	time interval:1.000607185s
+2023/03/16 11:45:19	[34mINFO[0m	example/sched.go:57	计数器 run 2 times
+2023/03/16 11:45:19	[34mINFO[0m	example/sched.go:40	time interval:999.281142ms
+2023/03/16 11:45:20	[34mINFO[0m	example/sched.go:40	time interval:999.935358ms
+2023/03/16 11:45:21	[34mINFO[0m	example/sched.go:40	time interval:999.757387ms
+2023/03/16 11:45:21	[34mINFO[0m	example/sched.go:57	计数器 run 3 times
+2023/03/16 11:45:22	[34mINFO[0m	example/sched.go:40	time interval:1.001320335s
+2023/03/16 11:45:23	[34mINFO[0m	example/sched.go:57	计数器 run 4 times
+2023/03/16 11:45:23	[34mINFO[0m	example/sched.go:40	time interval:998.870855ms
+2023/03/16 11:45:24	[34mINFO[0m	example/sched.go:40	time interval:1.000025482s
+2023/03/16 11:45:25	[34mINFO[0m	example/sched.go:57	计数器 run 5 times
+2023/03/16 11:45:25	[34mINFO[0m	example/sched.go:40	time interval:999.883451ms
+2023/03/16 11:45:26	[34mINFO[0m	example/sched.go:40	time interval:999.925827ms
+2023/03/16 11:45:27	[34mINFO[0m	example/sched.go:57	计数器 run 6 times
+2023/03/16 11:45:27	[34mINFO[0m	example/sched.go:40	time interval:1.000204379s
+2023/03/16 11:45:28	[34mINFO[0m	example/sched.go:40	time interval:1.000219261s
+2023/03/16 11:45:50	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:45:50	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:45:51	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:45:52	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:45:52	[34mINFO[0m	example/sched.go:40	time interval:999.731502ms
+2023/03/16 11:46:17	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:46:17	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:46:18	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:46:19	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:46:19	[34mINFO[0m	example/sched.go:40	time interval:1.000191197s
+2023/03/16 11:46:20	[34mINFO[0m	example/sched.go:40	time interval:1.000117342s
+2023/03/16 11:46:21	[34mINFO[0m	example/sched.go:57	计数器 run 2 times
+2023/03/16 11:46:21	[34mINFO[0m	example/sched.go:40	time interval:1.00024203s
+2023/03/16 11:46:22	[34mINFO[0m	example/sched.go:40	time interval:999.294963ms
+2023/03/16 11:46:25	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:46:25	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:46:26	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:46:27	[34mINFO[0m	example/sched.go:40	time interval:1.000342241s
+2023/03/16 11:46:27	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:46:28	[34mINFO[0m	example/sched.go:40	time interval:999.535323ms
+2023/03/16 11:46:29	[34mINFO[0m	example/sched.go:40	time interval:1.000256981s
+2023/03/16 11:46:29	[34mINFO[0m	example/sched.go:57	计数器 run 2 times
+2023/03/16 11:46:30	[34mINFO[0m	example/sched.go:40	time interval:999.444764ms
+2023/03/16 11:46:31	[34mINFO[0m	example/sched.go:40	time interval:1.000683352s
+2023/03/16 11:46:31	[34mINFO[0m	example/sched.go:57	计数器 run 3 times
+2023/03/16 11:46:32	[34mINFO[0m	example/sched.go:40	time interval:1.000143935s
+2023/03/16 11:48:22	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:48:22	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:48:23	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:48:24	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:48:24	[34mINFO[0m	example/sched.go:40	time interval:999.785954ms
+2023/03/16 11:48:25	[34mINFO[0m	example/sched.go:40	time interval:999.478497ms
+2023/03/16 11:48:26	[34mINFO[0m	example/sched.go:57	计数器 run 2 times
+2023/03/16 11:48:26	[34mINFO[0m	example/sched.go:40	time interval:1.000408287s
+2023/03/16 11:48:27	[34mINFO[0m	example/sched.go:40	time interval:999.466789ms
+2023/03/16 11:48:28	[34mINFO[0m	example/sched.go:40	time interval:1.000520629s
+2023/03/16 11:48:28	[34mINFO[0m	example/sched.go:57	计数器 run 3 times
+2023/03/16 11:48:29	[34mINFO[0m	example/sched.go:40	time interval:1.000594145s
+2023/03/16 11:48:30	[34mINFO[0m	example/sched.go:57	计数器 run 4 times
+2023/03/16 11:48:30	[34mINFO[0m	example/sched.go:40	time interval:999.569551ms
+2023/03/16 11:48:31	[34mINFO[0m	example/sched.go:40	time interval:999.766493ms
+2023/03/16 11:48:32	[34mINFO[0m	example/sched.go:40	time interval:1.000445403s
+2023/03/16 11:48:32	[34mINFO[0m	example/sched.go:57	计数器 run 5 times
+2023/03/16 11:48:33	[34mINFO[0m	example/sched.go:40	time interval:999.604397ms
+2023/03/16 11:48:34	[34mINFO[0m	example/sched.go:57	计数器 run 6 times
+2023/03/16 11:48:34	[34mINFO[0m	example/sched.go:40	time interval:1.000362021s
+2023/03/16 11:48:35	[34mINFO[0m	example/sched.go:40	time interval:999.418595ms
+2023/03/16 11:48:36	[34mINFO[0m	example/sched.go:57	计数器 run 7 times
+2023/03/16 11:48:36	[34mINFO[0m	example/sched.go:40	time interval:1.000800758s
+2023/03/16 11:48:37	[34mINFO[0m	example/sched.go:40	time interval:999.374215ms
+2023/03/16 11:48:38	[34mINFO[0m	example/sched.go:57	计数器 run 8 times
+2023/03/16 11:48:38	[34mINFO[0m	example/sched.go:40	time interval:999.710488ms
+2023/03/16 11:48:39	[34mINFO[0m	example/sched.go:40	time interval:999.71766ms
+2023/03/16 11:48:40	[34mINFO[0m	example/sched.go:40	time interval:1.000491286s
+2023/03/16 11:48:40	[34mINFO[0m	example/sched.go:57	计数器 run 9 times
+2023/03/16 11:48:41	[34mINFO[0m	example/sched.go:40	time interval:1.000091824s
+2023/03/16 11:48:42	[34mINFO[0m	example/sched.go:57	计数器 run 10 times
+2023/03/16 11:48:42	[34mINFO[0m	example/sched.go:40	time interval:999.361935ms
+2023/03/16 11:48:43	[34mINFO[0m	example/sched.go:40	time interval:1.000647253s
+2023/03/16 11:48:44	[34mINFO[0m	example/sched.go:40	time interval:1.000052603s
+2023/03/16 11:48:44	[34mINFO[0m	example/sched.go:57	计数器 run 11 times
+2023/03/16 11:48:45	[34mINFO[0m	example/sched.go:40	time interval:1.00014074s
+2023/03/16 11:48:46	[34mINFO[0m	example/sched.go:57	计数器 run 12 times
+2023/03/16 11:48:46	[34mINFO[0m	example/sched.go:40	time interval:999.512177ms
+2023/03/16 11:48:47	[34mINFO[0m	example/sched.go:40	time interval:1.000495632s
+2023/03/16 11:48:48	[34mINFO[0m	example/sched.go:57	计数器 run 13 times
+2023/03/16 11:48:48	[34mINFO[0m	example/sched.go:40	time interval:999.076329ms
+2023/03/16 11:48:49	[34mINFO[0m	example/sched.go:40	time interval:1.000219596s
+2023/03/16 11:48:50	[34mINFO[0m	example/sched.go:57	计数器 run 14 times
+2023/03/16 11:48:50	[34mINFO[0m	example/sched.go:40	time interval:1.000264708s
+2023/03/16 11:48:53	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:48:53	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:48:59	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:48:59	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:49:00	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:49:10	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '报时器' started.
+2023/03/16 11:49:10	[35mDEBUG[0m	cronjob/job.go:170	Cronjob: '计数器' started.
+2023/03/16 11:49:11	[34mINFO[0m	example/sched.go:40	time interval:2562047h47m16.854775807s
+2023/03/16 11:49:12	[34mINFO[0m	example/sched.go:40	time interval:1.000604001s
+2023/03/16 11:49:12	[34mINFO[0m	example/sched.go:57	计数器 run 1 times
+2023/03/16 11:49:13	[34mINFO[0m	example/sched.go:40	time interval:999.448282ms
+2023/03/16 11:49:14	[34mINFO[0m	example/sched.go:57	计数器 run 2 times
+2023/03/16 11:49:14	[34mINFO[0m	example/sched.go:40	time interval:1.000093197s
+2023/03/16 11:49:15	[34mINFO[0m	example/sched.go:40	time interval:999.594109ms
+2023/03/16 11:49:16	[34mINFO[0m	example/sched.go:57	计数器 run 3 times
+2023/03/16 11:49:16	[34mINFO[0m	example/sched.go:40	time interval:1.000848216s
+2023/03/16 11:49:17	[34mINFO[0m	example/sched.go:40	time interval:999.227173ms
+2023/03/16 11:49:18	[34mINFO[0m	example/sched.go:57	计数器 run 4 times
+2023/03/16 11:49:18	[34mINFO[0m	example/sched.go:40	time interval:1.000482426s

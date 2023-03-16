@@ -2,6 +2,7 @@ package example
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Chendemo12/functools/cronjob"
 	llog "github.com/Chendemo12/functools/logger"
@@ -10,6 +11,7 @@ import (
 )
 
 var lg llog.Iface
+var flg llog.FIface
 
 func init() {
 	lg = zaplog.NewLogger(&zaplog.Config{
@@ -20,6 +22,8 @@ func init() {
 		MaxBackups: 4,
 		Compress:   true,
 	}).Sugar()
+
+	flg = llog.NewDefaultLogger()
 }
 
 type Clock struct {
@@ -37,6 +41,8 @@ func (c *Clock) Do(ctx context.Context) error {
 
 	return nil
 }
+
+func (c *Clock) WhenError(errs ...error) {}
 
 type Click struct {
 	cronjob.Func
@@ -56,6 +62,10 @@ func (c *Click) Do(ctx context.Context) error {
 func Example_NewScheduler() {
 
 	pCtx, _ := context.WithTimeout(context.Background(), 50*time.Second)
+
+	flg.Errorf("new scheduler: %s", errors.New("error format"))
+	flg.Warnf("new scheduler: %s", errors.New("warn format"))
+	flg.Debugf("new scheduler: %s", errors.New("debug format"))
 
 	scheduler := cronjob.NewScheduler(pCtx, lg)
 	scheduler.Add(&Clock{})

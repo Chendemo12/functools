@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Chendemo12/functools/helper"
-	"github.com/Chendemo12/functools/zaplog"
+	"github.com/Chendemo12/functools/logger"
 	"strings"
 	"time"
 
@@ -21,9 +21,9 @@ func (e HttprError) String() string {
 	return e.Message
 }
 
-// 重写req的日志接口，替换成统一的 zaplog.Iface
+// 重写req的日志接口，替换成统一的 logger.Iface
 type httprLogger struct {
-	logger zaplog.Iface
+	logger logger.Iface
 }
 
 func (l *httprLogger) Errorf(format string, v ...any) {
@@ -68,10 +68,11 @@ type Httpr struct {
 }
 
 // makePrefix组合前缀，形如："http://127.0.0.1:3306/api/"
+//
 //	@param	prefix	string	地址前缀
 func (h *Httpr) makePrefix(prefix string) *Httpr {
 	// noinspection HttpUrlsUsage
-	h.prefix = helper.CombineStrings(
+	h.prefix = helper.F(
 		"http://", h.Host, ":", h.Port, "/", strings.TrimPrefix(prefix, "/"), "/",
 	)
 
@@ -96,6 +97,7 @@ func (h *Httpr) init() *Httpr {
 }
 
 // SetTimeout 设置请求的超时时间，单位s
+//
 //	@param	timeout	int	超时时间(s)
 func (h *Httpr) SetTimeout(timeout int) *Httpr {
 	h.timeout = time.Duration(timeout) * time.Second
@@ -103,12 +105,13 @@ func (h *Httpr) SetTimeout(timeout int) *Httpr {
 }
 
 // SetLogger 自定义请求日志
-func (h *Httpr) SetLogger(logger zaplog.Iface) *Httpr {
+func (h *Httpr) SetLogger(logger logger.Iface) *Httpr {
 	h.logger = &httprLogger{logger: logger}
 	return h
 }
 
 // SetUrlPrefix 设置地址前缀, 形如"/api"这样的路由前缀，以"/"开头并不以"/"结尾
+//
 //	@param	prefix	string	地址前缀
 func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 	// 重写现有的路由前缀
@@ -120,6 +123,7 @@ func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 }
 
 // DoRequest 发起网络请求
+//
 //	@param	method	string				请求方法，取值为GET/POST/PATCH/PUT/DELETE
 //	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
 //	@param	query	map[string]string	查询参数map
@@ -174,6 +178,7 @@ func (h *Httpr) NewDevClient() *Httpr {
 }
 
 // UnmarshalJson 将Http的返回体转换成结构体
+//
 //	@param	resp	*req.Response	Http返回体
 //	@param	v		any				结果结构体指针
 func (h *Httpr) UnmarshalJson(resp *req.Response, v any) error {
@@ -192,6 +197,7 @@ func (h *Httpr) UnmarshalJson(resp *req.Response, v any) error {
 }
 
 // Get 发起一个带查询参数的Get请求
+//
 //	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
 //	@param	query	map[string]string	查询参数map
 func (h *Httpr) Get(url string, query map[string]string) (*req.Response, error) {
@@ -199,6 +205,7 @@ func (h *Httpr) Get(url string, query map[string]string) (*req.Response, error) 
 }
 
 // Post 发起一个带请求体的Post请求
+//
 //	@param	url		string			路由地址
 //	@param	body	map[string]any	请求数据	cannot	be	nil
 func (h *Httpr) Post(url string, body map[string]any) (*req.Response, error) {
@@ -210,6 +217,7 @@ func (h *Httpr) Post(url string, body map[string]any) (*req.Response, error) {
 }
 
 // Put 发起一个带请求体的Put请求
+//
 //	@param	url		string			路由地址
 //	@param	body	map[string]any	请求数据
 func (h *Httpr) Put(url string, body map[string]any) (*req.Response, error) {
@@ -217,6 +225,7 @@ func (h *Httpr) Put(url string, body map[string]any) (*req.Response, error) {
 }
 
 // Patch 发起一个带请求体的Patch请求
+//
 //	@param	url		string			路由地址
 //	@param	body	map[string]any	请求数据
 func (h *Httpr) Patch(url string, body map[string]any) (*req.Response, error) {
@@ -224,12 +233,14 @@ func (h *Httpr) Patch(url string, body map[string]any) (*req.Response, error) {
 }
 
 // Delete  发起一个Delete请求
+//
 //	@param	url	string	路由地址
 func (h *Httpr) Delete(url string) (*req.Response, error) {
 	return h.DoRequest("DELETE", url, nil, nil)
 }
 
 // PostWithQuery 发起一个带查询参数的Post请求
+//
 //	@param	url		string				路由地址
 //	@param	query	map[string]string	查询参数map
 //	@param	body	map[string]any		请求数据	cannot	be	nil
@@ -242,6 +253,7 @@ func (h *Httpr) PostWithQuery(url string, query map[string]string, body map[stri
 }
 
 // DeleteWithQuery 发起一个带查询参数的Delete请求
+//
 //	@param	url		string				路由地址
 //	@param	query	map[string]string	查询参数map
 func (h *Httpr) DeleteWithQuery(url string, query map[string]string) (*req.Response, error) {
@@ -249,6 +261,7 @@ func (h *Httpr) DeleteWithQuery(url string, query map[string]string) (*req.Respo
 }
 
 // PutWithQuery 发起一个带查询参数的Put请求
+//
 //	@param	url		string				路由地址
 //	@param	query	map[string]string	查询参数map
 //	@param	body	map[string]any		请求数据
@@ -257,6 +270,7 @@ func (h *Httpr) PutWithQuery(url string, query map[string]string, body map[strin
 }
 
 // PatchWithQuery 发起一个带查询参数的Patch请求
+//
 //	@param	url		string				路由地址
 //	@param	query	map[string]string	查询参数map
 //	@param	body	map[string]any		请求数据
@@ -279,7 +293,7 @@ func (h *Httpr) PatchWithQuery(url string, query map[string]string, body map[str
 //		return "", err
 //	}
 //	return text, nil
-func NewHttpr(host, port string, timeout int, logger zaplog.Iface) (*Httpr, error) {
+func NewHttpr(host, port string, timeout int, logger logger.Iface) (*Httpr, error) {
 	if host == "" || port == "" {
 		return nil, errors.New("host and port cannot be empty")
 	}

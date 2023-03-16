@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.1.22 - (20230316)
+
+### Refactor
+
+- 修改`CronJob.WhenError(errs ...error)`接口;
+- 修改`Httpr.logger`为`logger.Iface`接口;
+- 废弃`zaplog.ConsoleLogger`;
+
+### Feat
+
+- `logger.DefaultLogger`新增`xxxf`接口;
+
 ## 0.1.21 - (20230308)
 
 ### Feat

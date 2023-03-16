@@ -66,6 +66,27 @@ func (l *DefaultLogger) Error(args ...any) {
 	_ = l.error.Output(2, fmt.Sprintln(args...))
 }
 
+func (l *DefaultLogger) Errorf(format string, v ...any) {
+	if atomic.LoadInt32(&l.isDiscard) != 0 {
+		return
+	}
+	_ = l.error.Output(2, fmt.Errorf(format, v...).Error())
+}
+
+func (l *DefaultLogger) Warnf(format string, v ...any) {
+	if atomic.LoadInt32(&l.isDiscard) != 0 {
+		return
+	}
+	_ = l.warn.Output(2, fmt.Errorf(format, v...).Error())
+}
+
+func (l *DefaultLogger) Debugf(format string, v ...any) {
+	if atomic.LoadInt32(&l.isDiscard) != 0 {
+		return
+	}
+	_ = l.debug.Output(2, fmt.Errorf(format, v...).Error())
+}
+
 func NewLogger(out io.Writer, prefix string, flag int) *DefaultLogger {
 	d := &DefaultLogger{
 		info:  log.New(out, blue+end+prefix, flag|log.Lmsgprefix),

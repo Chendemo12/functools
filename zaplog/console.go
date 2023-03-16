@@ -27,7 +27,7 @@ func init() {
 	console = zap.New(fileCore, zap.AddCaller(), zap.AddCallerSkip(1))
 }
 
-// ConsoleLogger 控制台日志
+// Deprecated: ConsoleLogger 控制台日志, 替换为 logger.DefaultLogger 实现
 /*
 此自定义日志仅输出到控制台，用于解决生产环境下无法输出一些调试信息，自定义日志需实现CustomLoggerIface接口
 	SDebug()方法仅支持输入字符串，速度更好
