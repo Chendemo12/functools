@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.23 - (20230329)
+
+### Fix
+
+- `Scheduler`超时退出，`CronJob`超时关闭(context泄漏);
+
 ## 0.1.22 - (20230316)
 
 ### Refactor

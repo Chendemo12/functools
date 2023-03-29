@@ -73,8 +73,12 @@ func (s *Schedule) AtTime() <-chan time.Time { return s.ticker.C }
 // Do 执行任务
 func (s *Schedule) Do() {
 	done := make(chan struct{}, 1)
+	ctx, cancel := s.ctx, s.cancel // 当下一次调度时，此被修改
+	defer cancel()                 // 执行完毕/超时，关闭子协程
+	defer close(done)
+
 	go func() {
-		err := s.job.Do(s.ctx)
+		err := s.job.Do(ctx)
 		done <- struct{}{} // 任务执行完毕
 
 		if err != nil { // 此次任务执行发生错误
@@ -90,6 +94,7 @@ func (s *Schedule) Do() {
 		s.output(s.logger.Warn, fmt.Sprintf("'%s' do timeout", s.job.String()))
 		// 单步任务执行时间超过了任务循环间隔,认为超时
 		s.job.WhenTimeout()
+		return
 	}
 }
 
@@ -106,7 +111,7 @@ func (s *Schedule) Scheduler() {
 		s.ctx, s.cancel = context.WithTimeout(s.pctx, s.job.Interval())
 		select {
 		case <-s.pctx.Done(): // 父节点被关闭,终止任务
-			break
+			return
 		case <-s.AtTime(): // 到达任务的执行时间, 创建一个新的事件任务
 			go s.Do()
 		}
