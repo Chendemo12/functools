@@ -2,8 +2,11 @@ package helper
 
 import (
 	"encoding/base64"
-	jsoniter "github.com/json-iterator/go"
+	"reflect"
 	"strings"
+	"unsafe"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 const hexTable = "0123456789abcdef"
@@ -33,9 +36,29 @@ var (
 	StringsJoin = CombineStrings
 )
 
+// B2S 将[]byte转换为字符串,(就地修改)零内存分配
+func B2S(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+// S2B 将字符串转换为[]byte,(就地修改)零内存分配
+func S2B(s string) (b []byte) {
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+
+	return b
+}
+
 // HexBeautify 格式化显示十六进制
 func HexBeautify(src []byte) string {
-	length := len(src)*3 + 1
+	if len(src) == 0 {
+		return ""
+	}
+
+	length := len(src) * 3 // 一个byte用2个字符+1个空格表示
 	dst := make([]byte, length)
 
 	j := 0
@@ -46,11 +69,7 @@ func HexBeautify(src []byte) string {
 		j += 3
 	}
 	// 去除末尾的空格
-	if length >= 2 {
-		return string(dst[:length-2])
-	} else {
-		return string(dst[:length-1])
-	}
+	return B2S(dst)[:length-1]
 }
 
 // CombineStrings 合并字符串, 实现等同于strings.Join()，只是少了判断分隔符
@@ -135,6 +154,7 @@ func Reverse[T any](s *[]T) {
 }
 
 // IsEqual 判断2个切片是否相等
+//
 //	@return	true if is equal
 func IsEqual[T comparable](a, b []T) bool {
 	if len(a) != len(b) {

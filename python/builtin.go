@@ -2,10 +2,11 @@
 package python
 
 import (
-	"github.com/Chendemo12/functools/helper"
-	"github.com/Chendemo12/functools/types"
 	"reflect"
 	"strconv"
+
+	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/functools/types"
 )
 
 // Any 任意一个参数为true时为true
@@ -22,14 +23,13 @@ func Any(args ...bool) bool {
 func All(args ...bool) bool {
 	if len(args) == 0 {
 		return false
-	} else {
-		for i := 0; i < len(args); i++ {
-			if !args[i] {
-				return false
-			}
-		}
-		return true
 	}
+	for i := 0; i < len(args); i++ {
+		if !args[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Repr 格式化显示对象
@@ -52,40 +52,40 @@ func Repr(object any, excludeName ...bool) (message string) {
 	switch object.(type) {
 	// 数值类型
 	case int8:
-		return strconv.FormatInt(int64(object.(int8)), 10)
+		message = strconv.FormatInt(int64(object.(int8)), 10)
 	case int16:
-		return strconv.FormatInt(int64(object.(int16)), 10)
+		message = strconv.FormatInt(int64(object.(int16)), 10)
 	case int32:
-		return strconv.FormatInt(int64(object.(int32)), 10)
+		message = strconv.FormatInt(int64(object.(int32)), 10)
 	case int:
-		return strconv.FormatInt(int64(object.(int)), 10)
+		message = strconv.FormatInt(int64(object.(int)), 10)
 	case int64:
-		return strconv.FormatInt(object.(int64), 10)
+		message = strconv.FormatInt(object.(int64), 10)
 
 	case uint8:
-		return strconv.FormatUint(uint64(object.(uint8)), 10)
+		message = strconv.FormatUint(uint64(object.(uint8)), 10)
 	case uint16:
-		return strconv.FormatUint(uint64(object.(uint16)), 10)
+		message = strconv.FormatUint(uint64(object.(uint16)), 10)
 	case uint32:
-		return strconv.FormatUint(uint64(object.(uint32)), 10)
+		message = strconv.FormatUint(uint64(object.(uint32)), 10)
 	case uint:
-		return strconv.FormatUint(uint64(object.(uint)), 10)
+		message = strconv.FormatUint(uint64(object.(uint)), 10)
 	case uint64:
-		return strconv.FormatUint(object.(uint64), 10)
+		message = strconv.FormatUint(object.(uint64), 10)
 
 	case float32:
-		return strconv.FormatFloat(float64(object.(float32)), 'f', -1, 64)
+		message = strconv.FormatFloat(float64(object.(float32)), 'f', -1, 64)
 	case float64:
-		return strconv.FormatFloat(object.(float64), 'f', -1, 64)
+		message = strconv.FormatFloat(object.(float64), 'f', -1, 64)
 
 	// 字符串类型
 	case string:
 		message = object.(string)
 	case bool:
 		if object.(bool) {
-			return "true"
+			message = "true"
 		} else {
-			return "false"
+			message = "false"
 		}
 
 	// 数组类型
@@ -98,7 +98,7 @@ func Repr(object any, excludeName ...bool) (message string) {
 	case error:
 		message = object.(error).Error()
 	case uintptr:
-		return "uintptr"
+		message = "uintptr"
 
 	default: // 复杂的自定义类型
 		ex := Any(excludeName...) // 是否排除对象名
@@ -116,14 +116,14 @@ func Repr(object any, excludeName ...bool) (message string) {
 			if err != nil {
 				message = name
 			} else {
-				message = helper.CombineStrings(name, "(", string(bs), ")")
+				message = helper.CombineStrings(name, "(", helper.B2S(bs), ")")
 			}
 		} else {
 			bytes, err := helper.DefaultJsonMarshal(object)
 			if err != nil {
 				message = ""
 			}
-			message = string(bytes)
+			message = helper.B2S(bytes)
 		}
 	}
 	return
@@ -176,4 +176,22 @@ func In[T comparable](s []T, x T) bool {
 		}
 	}
 	return false
+}
+
+// Map 对序列 seq 中的每一个元素一次执行方法fn，仅指针类型有效
+func Map[T any](fn func(t T), seq []T) {
+	for i := 0; i < len(seq); i++ {
+		fn(seq[i])
+	}
+}
+
+// Filter 返回序列seq中满足条件fn的元素，产生一个符合条件的新切片
+func Filter[T any](fn func(t T) bool, seq []T) []T {
+	dst := make([]T, 0)
+	for _, s := range seq {
+		if fn(s) {
+			dst = append(dst, s)
+		}
+	}
+	return dst
 }
