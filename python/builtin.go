@@ -168,8 +168,8 @@ func Index[T comparable](s []T, x T) int {
 //
 //	@param	s	[]T	查找序列
 //	@param	x	T	特定元素
-//	@return	bool true if s contains x, false otherwise
-func In[T comparable](s []T, x T) bool {
+//	@return	bool true if x in s, false otherwise
+func In[T comparable](x T, s []T) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] == x {
 			return true
@@ -194,4 +194,18 @@ func Filter[T any](fn func(t T) bool, seq []T) []T {
 		}
 	}
 	return dst
+}
+
+// Has 查找序列s内是否存在元素x
+//
+//	@param	s	[]T	查找序列
+//	@param	x	T	特定元素
+//	@return	bool true if s contains x, false otherwise
+func Has[T comparable](s []T, x T) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == x {
+			return true
+		}
+	}
+	return false
 }
