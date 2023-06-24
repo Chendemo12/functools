@@ -27,6 +27,7 @@ var (
 )
 
 // ViperParse viper解析方法
+//
 //	@param	filepath	string	配置文件路径
 func ViperParse(conf any, filepath string) error {
 	cv := viper.New()
@@ -55,6 +56,7 @@ func Environs() []string {
 }
 
 // DoesFileExists 判读一个文件是否存在
+//
 //	@param	path	string	文件路径
 //	@return	bool 存在则为true
 func DoesFileExists(filepath string) bool {
@@ -67,6 +69,7 @@ func DoesFileExists(filepath string) bool {
 }
 
 // LoadDotenv 从文件加载环境变量, 不覆盖系统环境变量
+//
 //	@param	filepath	string	环境变量文件路径
 //	@return	error 如果文件不存在则返回错误
 func LoadDotenv(filepath string) error {
@@ -81,6 +84,7 @@ func LoadDotenv(filepath string) error {
 }
 
 // AdvancedLoadDotenv 加载环境变量文件, 是 LoadDotenv 方法的增强版
+//
 //	@param	filepath	string		环境变量文件路径
 //	@param	stream		io.Reader	IO读取接口
 //	@param	override	bool		是否覆盖系统环境变量
@@ -162,6 +166,13 @@ func GetInt(key string, args ...any) int {
 				return v
 			}
 
+		case bool:
+			if first.(bool) {
+				return 1
+			} else {
+				return 0
+			}
+
 		default:
 			panic("unknown type of args")
 		}
@@ -207,6 +218,14 @@ func GetString(key string, args ...any) string {
 			return string(first.([]byte))
 		case []string:
 			return strings.Join(first.([]string), "")
+
+		case bool:
+			if first.(bool) {
+				return "true"
+			} else {
+				return "false"
+			}
+
 		default:
 			panic("unknown type of args")
 		}
