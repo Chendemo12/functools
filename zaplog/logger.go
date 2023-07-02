@@ -9,6 +9,8 @@ import (
 	"strconv"
 )
 
+const timeformat = "2006/01/02 15:04:05"
+
 const (
 	DEBUG    = zapcore.DebugLevel
 	INFO     = zapcore.InfoLevel
@@ -90,6 +92,7 @@ func NewLogger(c ...*Config) *zap.Logger {
 }
 
 // GetLogger 依据文件名查询日志句柄
+//
 //	@param	filename	string	日志文件名
 //	@param	deft		[]bool	是否在未找到日志句柄时返回默认的日志句柄
 func GetLogger(filename string, deft ...bool) *zap.SugaredLogger {

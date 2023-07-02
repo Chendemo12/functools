@@ -3,7 +3,7 @@ package structfuncs
 
 import (
 	"errors"
-	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/fastapi-tool/helper"
 	"reflect"
 	"unicode"
 )
@@ -26,15 +26,16 @@ func Reflect(object any) (at reflect.Type, v reflect.Value, err error) {
 }
 
 // ToMap 转换struct为map (未优化)
+//
 //	@param	object	struct对象
 func ToMap(object any) (map[string]any, error) {
 	mp := make(map[string]any)
-	bytes, err := helper.DefaultJsonMarshal(object)
+	bytes, err := helper.JsonMarshal(object)
 	if err != nil {
 		return nil, err
 	}
 
-	err = helper.DefaultJsonUnmarshal(bytes, &mp)
+	err = helper.JsonUnmarshal(bytes, &mp)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func ToMap(object any) (map[string]any, error) {
 
 // ToString 转换struct为string类型
 func ToString(object any) string {
-	if bytes, err := helper.DefaultJsonMarshal(&object); err != nil {
+	if bytes, err := helper.JsonMarshal(&object); err != nil {
 		return ""
 	} else {
 		return string(bytes)
@@ -52,9 +53,9 @@ func ToString(object any) string {
 
 // ToJson 转换struct为map和string类型
 func ToJson(s any) (map[string]any, string) {
-	data, _ := helper.DefaultJsonMarshal(s)
+	data, _ := helper.JsonMarshal(s)
 	m := make(map[string]any)
-	if err := helper.DefaultJsonUnmarshal(data, &m); err != nil {
+	if err := helper.JsonUnmarshal(data, &m); err != nil {
 		return nil, ""
 	}
 	return m, string(data)
@@ -112,6 +113,7 @@ func GetFieldsName(s any) []string {
 }
 
 // GetFieldsValue 获取struct的字段键值对
+//
 //	@param	s	any	struct	Object
 //	@return	map[string]any {key: value}
 func GetFieldsValue(s any) map[string]any {
@@ -211,6 +213,7 @@ func GetFieldsTags(s any) map[string]reflect.StructTag {
 }
 
 // GetFieldsType 获取struct的字段类型
+//
 //	@param	s	any	struct	Object
 //	@return	map[string]any {key: type}
 func GetFieldsType(s any) map[string]reflect.Kind {

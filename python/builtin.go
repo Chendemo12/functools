@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/fastapi-tool/helper"
 	"github.com/Chendemo12/functools/types"
 )
 
@@ -112,14 +112,14 @@ func Repr(object any, excludeName ...bool) (message string) {
 				name = at.Name()
 			}
 
-			bs, err := helper.DefaultJsonMarshal(&object)
+			bs, err := helper.JsonMarshal(&object)
 			if err != nil {
 				message = name
 			} else {
 				message = helper.CombineStrings(name, "(", helper.B2S(bs), ")")
 			}
 		} else {
-			bytes, err := helper.DefaultJsonMarshal(object)
+			bytes, err := helper.JsonMarshal(object)
 			if err != nil {
 				message = ""
 			}

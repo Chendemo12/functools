@@ -2,7 +2,7 @@
 package cprint
 
 import (
-	"github.com/Chendemo12/functools/helper"
+	"github.com/Chendemo12/fastapi-tool/helper"
 	"github.com/Chendemo12/functools/python"
 	"os"
 )
