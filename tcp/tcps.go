@@ -338,41 +338,7 @@ type TcpsConfig struct {
 	MaxOpenConn    int    `json:"max_open_conn"`
 }
 
-// NewAsyncTcpServer 创建一个新的TCP server
-//
-// TCP server 此处已做消息处理的解构，提供一个默认的消息处理方法；
-// 在实际的业务处理中，需要自定义一个struct，并实现ServerHandler的接口，
-// 当服务端接收到来自客户端的数据时，会首先创建ServerHandler.OnAccepted()协程，进行连接时任务处理；
-// 并在收到客户端消息时自动调用ServerHandler.HandlerFunc()方法来处理数据;
-//
-// 若需返回数据到客户端，则ServerHandler.HandlerFunc()方法实现的返回值必须是TCPMessage{}的指针，若为nil则不发送数据。
-// 因此为保证数据处理的完整性，建议将ServerHandler{}作为自定义struct的第一个匿名字段，并重写Handler()方法；
-//
-// # Usage
-//
-//	// 1. 首先创建一个自定义struct，并将ServerHandler作为第一个匿名字段：
-//	type TCPHandler struct {
-//		HandlerFunc
-//	}
-//
-//	// 2. 重写Handler(msg *Frame) *Frame()方法：
-//	func (h *TCPHandler) HandlerFunc(msg *Frame) *Frame {
-//		fmt.Println(msg.Hex())
-//		return nil // 不返回任何数据
-//	}
-//
-//	// 3. 启动一个新服务
-//	ts := NewAsyncTcpServer(
-//		&TcpsConfig{
-//			Host:           "0.0.0.0",
-//			Port:           8090,
-//			maxOpenConn:    5,
-//			MessageHandler: &TCPHandler{},
-//			byteOrder:      "big",
-//			logger:         logger.ConsoleLogger{},
-//		},
-//	)
-func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
+func NewTcpServer(c ...*TcpsConfig) *Server {
 	var s *Server
 
 	if len(c) == 0 {
@@ -417,6 +383,48 @@ func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
 	if s.MaxOpenConnNums() == 0 {
 		s.SetMaxOpenConn(defaultMaxOpenConn)
 	}
+
+	return s
+}
+
+// NewAsyncTcpServer 创建一个新的TCP server
+//
+// TCP server 此处已做消息处理的解构，提供一个默认的消息处理方法；
+// 在实际的业务处理中，需实现 HandlerFunc 接口，
+//
+// 当服务端接收到来自客户端的数据时，会首先执行 HandlerFunc.OnAccepted 进行连接时任务处理,
+// 此任务执行完毕后才会读取并处理数据；
+//
+// 收到客户端消息时自动调用 HandlerFunc.Handler 方法来处理数据;
+//
+// 若需返回数据到客户端，则可直接在 HandlerFunc.Handler 内通过 Remote 的方法实现。
+//
+// # Usage
+//
+//	// 1. 首先创建一个自定义struct，并实现 HandlerFunc 接口
+//	type TCPHandler struct {
+//		MessageHandler
+//	}
+//
+//	// 2. 重写 Handler 方法：
+//	func (h *TCPHandler) Handler(r *Remote) error {
+//		return nil
+//	}
+//
+//	// 3. 启动一个新服务
+//	ts := NewAsyncTcpServer(
+//		&TcpsConfig{
+//			Host:           "0.0.0.0",
+//			Port:           8090,
+//			maxOpenConn:    5,
+//			MessageHandler: &TCPHandler{},
+//			byteOrder:      "big",
+//			logger:         nil,
+//		},
+//	)
+func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
+	var s *Server
+	s = NewTcpServer(c...)
 
 	go func() {
 		err := s.Serve()

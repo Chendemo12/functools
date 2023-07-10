@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.27 - (20230710)
+
+### Feat
+
+- `tcp.Client`, `tcp.Server` 新增方法;
+
 ## 0.1.26 - (20230702)
 
 ### Refactor

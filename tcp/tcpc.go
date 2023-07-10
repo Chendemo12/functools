@@ -44,6 +44,18 @@ func (c *Client) Logger() logger.Iface { return c.r.logger }
 func (c *Client) IsRunning() bool      { return c.isRunning }
 func (c *Client) Stop() error          { return c.r.Close() }
 
+func (c *Client) Write(buf []byte) (int, error) { return c.r.Write(buf) }
+func (c *Client) Drain() error                  { return c.r.Drain() }
+
+// WriteMessage 一次性写入并发送数据
+func (c *Client) WriteMessage(buf []byte) error {
+	_, err := c.r.Write(buf)
+	if err != nil {
+		return err
+	}
+	return c.r.Drain()
+}
+
 // 连接远程服务
 func (c *Client) connect() error {
 	conn, err := net.Dial("tcp", c.RemoteAddr())
@@ -106,31 +118,7 @@ func (c *Client) Start() error {
 	return nil
 }
 
-// NewAsyncTcpClient 创建一个TCP客户端(非阻塞)
-//
-// 此处已实现业务处理的解耦，在使用过程中无需更改此文件源码，对于TcpClient，支持创建并启动多个客户端，
-// TcpClient提供了自带缓冲的收发通道，客户端Start()之后，会将收到的数据存入接收通道TcpClient.receiverChannel，可通过迭代TCPClient.Messages()来获取收到的数据；
-// 通过TcpClient.WriteMessage()来发送数据，从而实现业务的解耦。
-//
-// # Usage:
-//
-//	c := conn.NewAsyncTcpClient(&conn.TcpcConfig{
-//		Host:   "127.0.0.1",
-//		Port:   8090,
-//		byteOrder: "big",
-//		Logger: logger.ConsoleLogger{},
-//	})
-//
-//	// 读取数据：
-//	for msg := range c.Messages() {
-//		fmt.Println(msg)
-//	}
-//
-//	// 发送数据：
-//	if err := c.WriteMessage([]byte("hello")); err == nil {
-//		fmt.Println("<== message sent successfully")
-//	}
-func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
+func NewTcpClient(c ...*TcpcConfig) *Client {
 	var client *Client
 
 	if len(c) == 0 {
@@ -176,11 +164,23 @@ func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
 		client.reconnectDelay = 1 * time.Second
 	}
 
+	return client
+}
+
+// NewAsyncTcpClient 创建一个TCP客户端(非阻塞), 此处已启动数据的收发操作
+//
+// 此处已实现业务处理的解耦，在使用过程中无需更改此文件源码，对于TcpClient，支持创建并启动多个客户端，
+// 其重点在于实现 HandlerFunc 接口
+// 客户端除在连接成功时通过 Remote.Write 发送数据外,同样可以通过 Client.WriteMessage 来发送数据;
+func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
+	client := NewTcpClient(c...)
+
 	go func() {
 		err := client.Start()
 		if err != nil {
 			client.r.logger.Error("connected failed: ", err.Error())
 		}
 	}()
+
 	return client
 }
