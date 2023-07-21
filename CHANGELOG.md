@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.29 - (20230721)
+
+### Refactor
+
+- update dependence;
+
 ## 0.1.28 - (20230721)
 
 ### Refactor

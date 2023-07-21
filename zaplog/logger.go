@@ -2,9 +2,9 @@ package zaplog
 
 import (
 	"github.com/Chendemo12/functools/python"
-	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"strconv"
 )
