@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.30 - (20230721)
+
+### Fix
+
+- 修复`tcps.Server.isRunning`未初始化的错误；
+
 ## 0.1.29 - (20230721)
 
 ### Refactor

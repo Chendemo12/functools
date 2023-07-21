@@ -402,6 +402,7 @@ func NewTcpServer(c ...*TcpsConfig) *Server {
 		}
 	}
 	s.lock, s.wg = &sync.Mutex{}, &sync.WaitGroup{}
+	s.isRunning = &atomic.Bool{}
 
 	if s.byteOrder == "" { // 默认大端字节序
 		s.byteOrder = tcpByteOrder
