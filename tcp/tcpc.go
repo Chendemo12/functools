@@ -2,9 +2,12 @@ package tcp
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Chendemo12/functools/logger"
+	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,25 +38,7 @@ type Client struct {
 	r              *Remote
 	reconnectDelay time.Duration `description:"重连的等待间隔"`
 	reconnect      bool          `description:"是否重连"`
-	isRunning      bool
-}
-
-// RemoteAddr 远端服务器地址
-func (c *Client) RemoteAddr() string   { return c.r.addr }
-func (c *Client) Logger() logger.Iface { return c.r.logger }
-func (c *Client) IsRunning() bool      { return c.isRunning }
-func (c *Client) Stop() error          { return c.r.Close() }
-
-func (c *Client) Write(buf []byte) (int, error) { return c.r.Write(buf) }
-func (c *Client) Drain() error                  { return c.r.Drain() }
-
-// WriteMessage 一次性写入并发送数据
-func (c *Client) WriteMessage(buf []byte) error {
-	_, err := c.r.Write(buf)
-	if err != nil {
-		return err
-	}
-	return c.r.Drain()
+	isRunning      *atomic.Bool
 }
 
 // 连接远程服务
@@ -67,32 +52,16 @@ func (c *Client) connect() error {
 	// 处理连接时任务
 	err = c.handler.OnAccepted(c.r)
 	if err != nil {
-		c.Logger().Error(c.RemoteAddr()+": error on accept, ", err.Error())
+		c.Logger().Error(fmt.Sprintf(
+			"'%s' connected, but connection-event execute failed: %s", c.RemoteAddr(), err,
+		))
 	}
 	return nil
 }
 
-func (c *Client) Start() error {
-	if c.isRunning {
-		return errors.New("client is already running")
-	}
-
-	if c.handler == nil {
-		return errors.New("client MessageHandler is not define")
-	}
-
-	// 初始化内存
-	c.r.rx = make([]byte, bufLength, bufLength)
-	c.r.tx = make([]byte, bufLength, bufLength)
-
-	if err := c.connect(); err != nil {
-		// 如果启动时就无法连接，则直接退出
-		return err
-	}
-
-	c.isRunning = true // server is running
-
-	for c.isRunning { // 处理通信中任务
+// 阻塞处理通信中任务
+func (c *Client) proc() {
+	for c.isRunning.Load() {
 		err := c.r.readMessage()
 		if err != nil {
 			// 消息读取失败，重连
@@ -114,10 +83,73 @@ func (c *Client) Start() error {
 			continue
 		}
 	}
+}
+
+// RemoteAddr 远端服务器地址
+func (c *Client) RemoteAddr() string   { return c.r.addr }
+func (c *Client) Logger() logger.Iface { return c.r.logger }
+func (c *Client) IsRunning() bool      { return c.isRunning.Load() }
+func (c *Client) Stop() error          { return c.r.Close() }
+
+func (c *Client) Write(buf []byte) (int, error) { return c.r.Write(buf) }
+
+// WriteFrom 从一个reader中读取数据并写入缓冲区
+// 返回写入tcp缓冲区的字节数，而非从reader中读取的字节数
+// 仅在未从 reader 中读取到数据时返回错误
+func (c *Client) WriteFrom(reader io.Reader) (int, error) {
+	buf := make([]byte, c.r.TxFreeSize()) // 创建内存
+
+	i, err := reader.Read(buf)
+	if err != nil && i == 0 { // 未读取到数据
+		return i, err
+	}
+	// reader 数据太多，而写入缓冲区目前没有足够空间供其写入，正常
+	// err != nil && i != 0
+
+	return c.r.Write(buf[:i])
+}
+
+func (c *Client) Drain() error { return c.r.Drain() }
+
+// WriteMessage 一次性写入并发送数据
+func (c *Client) WriteMessage(buf []byte) error {
+	_, err := c.r.Write(buf)
+	if err != nil {
+		return err
+	}
+	return c.r.Drain()
+}
+
+// Start 启动客户端，如果连接失败则直接退出
+func (c *Client) Start() error { return c.AsyncStart() }
+
+// AsyncStart 异步启动客户端，如果连接失败则直接退出
+func (c *Client) AsyncStart() error {
+	if c.isRunning.Load() {
+		return errors.New("client is already running")
+	}
+
+	if c.handler == nil {
+		return errors.New("client MessageHandler is not define")
+	}
+
+	// 初始化内存
+	c.r.rx = make([]byte, bufLength, bufLength)
+	c.r.tx = make([]byte, bufLength, bufLength)
+
+	if err := c.connect(); err != nil {
+		// 如果启动时就无法连接，则直接退出
+		return err
+	}
+
+	c.isRunning.Store(true) // service is running
+
+	go c.proc() // 异步后台运行
 
 	return nil
 }
 
+// NewTcpClient 创建同步客户端，此处未主动连接服务端，需手动 Client.Start 发起连接
 func NewTcpClient(c ...*TcpcConfig) *Client {
 	var client *Client
 
@@ -135,7 +167,7 @@ func NewTcpClient(c ...*TcpcConfig) *Client {
 			handler:        defaultcConfig.MessageHandler,
 			reconnect:      defaultcConfig.Reconnect,
 			reconnectDelay: defaultcConfig.ReconnectDelay,
-			isRunning:      false,
+			isRunning:      &atomic.Bool{},
 		}
 	} else {
 		client = &Client{
@@ -151,6 +183,7 @@ func NewTcpClient(c ...*TcpcConfig) *Client {
 			handler:        c[0].MessageHandler,
 			reconnect:      c[0].Reconnect,
 			reconnectDelay: c[0].ReconnectDelay,
+			isRunning:      &atomic.Bool{},
 		}
 	}
 	if client.r.byteOrder == "" {
@@ -175,12 +208,10 @@ func NewTcpClient(c ...*TcpcConfig) *Client {
 func NewAsyncTcpClient(c ...*TcpcConfig) *Client {
 	client := NewTcpClient(c...)
 
-	go func() {
-		err := client.Start()
-		if err != nil {
-			client.r.logger.Error("connected failed: ", err.Error())
-		}
-	}()
+	err := client.Start()
+	if err != nil {
+		client.r.logger.Error("connected failed: ", err.Error())
+	}
 
 	return client
 }

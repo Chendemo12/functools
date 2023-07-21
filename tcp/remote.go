@@ -13,7 +13,7 @@ import (
 type Remote struct {
 	conn      net.Conn
 	logger    logger.Iface
-	lock      *sync.Mutex
+	lock      *sync.Mutex // write锁；read 操作为单线程操作，write操作存在多线程读写
 	addr      string
 	byteOrder string
 	rx        []byte `description:"接收缓冲区"`
@@ -93,6 +93,19 @@ func (r *Remote) Content() []byte {
 func (r *Remote) Unread() []byte {
 	return r.rx[r.lastRead:r.rxEnd]
 }
+
+// TxFreeSize 返回发送缓冲区剩余空间字节数
+func (r *Remote) TxFreeSize() int {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	// [1, 2, 3, 4, 0, 0, 0, 0, 0, 0]  -> 10
+	//		   10          3      -> 6
+	return bufLength - 1 - r.txEnd
+}
+
+// RxFreeSize 返回接收缓冲区剩余空间字节数
+func (r *Remote) RxFreeSize() int { return bufLength - r.rxEnd - 1 }
 
 // Write 将切片buf中的内容追加到发数据缓冲区内，并返回追加的数据长度;
 // 若缓冲区大小不足以写入全部数据，则返回实际写入的数据长度和错误消息

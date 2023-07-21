@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.1.28 - (20230721)
+
+### Refactor
+
+- 修改`tcpc.Start`默认为异步执行，无需阻塞当前调用；
+- 修改`tcpc.isRunning`为`*atomic.Bool`原子操作；
+
+### Feat
+
+- `tcpc.Client`新增方法`WriteFrom`;
+- `tcp.Remote`新增方法`TxFreeSize`, `RxFreeSize`;
+- `tcps.Server`新增异步启动方法`Start`;
+
 ## 0.1.27 - (20230710)
 
 ### Feat

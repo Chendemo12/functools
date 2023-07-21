@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 var bufLength = int(math.Pow(2, 16) + headerLength) //
@@ -120,6 +121,8 @@ func (l ConnLimit) Execute() error {
 	}
 }
 
+// ============================================================================
+
 // Server tcp 服务端实现
 type Server struct {
 	handler   HandlerFunc     `description:"消息处理方法"`
@@ -131,13 +134,95 @@ type Server struct {
 	byteOrder string          `description:"消息长度字节序"`
 	remotes   []*Remote       `description:"客户端连接"`
 	limit     *ConnLimit      `description:"连接限制"`
-	isRunning bool            `description:"是否正在运行"`
+	isRunning *atomic.Bool    `description:"是否正在运行"`
+}
+
+func (s *Server) init() error {
+	if s.isRunning.Load() {
+		return errors.New("server already running")
+	}
+	if s.handler == nil {
+		return errors.New("server MessageHandler is not define")
+	}
+	// 初始化连接记录池
+	s.remotes = make([]*Remote, s.MaxOpenConnNums())
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
+		s.remotes[i] = &Remote{
+			index:     i,
+			conn:      nil,
+			addr:      "",
+			logger:    s.logger,
+			byteOrder: s.byteOrder,
+			rxEnd:     headerLength,
+			txEnd:     headerLength,
+			rx:        make([]byte, bufLength, bufLength),
+			tx:        make([]byte, bufLength, bufLength),
+			lock:      &sync.Mutex{},
+		}
+	}
+
+	// 设置限制
+	s.logger.Info("limit cmd: " + s.limit.String())
+	err := s.limit.Execute()
+	if err != nil {
+		s.logger.Warn("executed failed, err: " + err.Error())
+	} else {
+		s.logger.Info("iptables limit executed successfully")
+	}
+
+	// 使用 net.Listen 监听连接的地址与端口
+	listener, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Info(fmt.Sprintf(
+		"server listening on: %s, with maximum number of connections: %d", s.addr, s.MaxOpenConnNums(),
+	))
+	s.listener = listener // 修改TCP运行状态
+	s.isRunning.Store(true)
+
+	return nil
+
+}
+
+// 阻塞处理通信中任务
+func (s *Server) proc() {
+	for s.isRunning.Load() {
+		conn, err := s.listener.Accept() // 等待连接
+		if err != nil {
+			continue
+		}
+
+		s.lock.Lock() // 建立连接时禁止并发
+
+		if s.GetOpenConnNums() < s.MaxOpenConnNums() { // 为客户端建立连接, 此时一定存在空闲槽位
+			for i := 0; i < s.MaxOpenConnNums(); i++ {
+				remote := s.remotes[i]
+				if remote.conn != nil {
+					continue
+				}
+
+				// 发现空闲槽位，接受客户端连接
+				remote.conn = conn
+				remote.addr = conn.RemoteAddr().String()
+
+				go s.process(remote) // 对每个新连接创建一个协程进行连接处理
+				break
+			}
+		} else { // 达到最大连接数量限制
+			s.logger.Warn("reached the upper limit, closed: " + conn.RemoteAddr().String())
+			_ = conn.Close()
+		}
+
+		s.lock.Unlock()
+	}
 }
 
 // Addr 获取工作地址
 func (s *Server) Addr() string         { return s.addr }
 func (s *Server) String() string       { return s.Addr() }
-func (s *Server) IsRunning() bool      { return s.isRunning }
+func (s *Server) IsRunning() bool      { return s.isRunning.Load() }
 func (s *Server) ByteOrder() string    { return s.byteOrder }
 func (s *Server) MaxOpenConnNums() int { return s.limit.Num() }
 
@@ -219,83 +304,28 @@ func (s *Server) Stop() {
 		_ = s.listener.Close()
 	}
 
-	s.isRunning = false
+	s.isRunning.Store(false)
 }
 
-// Serve 阻塞式启动TCP服务，若服务已在运行，则返回错误信息
-func (s *Server) Serve() error {
-	if s.isRunning {
-		return errors.New("server already running")
-	}
-	if s.handler == nil {
-		return errors.New("server MessageHandler is not define")
-	}
-	// 初始化连接记录池
-	s.remotes = make([]*Remote, s.MaxOpenConnNums())
-	for i := 0; i < s.MaxOpenConnNums(); i++ {
-		s.remotes[i] = &Remote{
-			index:     i,
-			conn:      nil,
-			addr:      "",
-			logger:    s.logger,
-			byteOrder: s.byteOrder,
-			rxEnd:     headerLength,
-			txEnd:     headerLength,
-			rx:        make([]byte, bufLength, bufLength),
-			tx:        make([]byte, bufLength, bufLength),
-			lock:      &sync.Mutex{},
-		}
-	}
-
-	// 设置限制
-	s.logger.Info("limit cmd: " + s.limit.String())
-	err := s.limit.Execute()
-	if err != nil {
-		s.logger.Warn("executed failed, err: " + err.Error())
-	} else {
-		s.logger.Info("iptables limit executed successfully")
-	}
-
-	// 使用 net.Listen 监听连接的地址与端口
-	listener, err := net.Listen("tcp", s.addr)
+// Start 异步非阻塞运行服务，若服务已在运行则返回错误信息
+func (s *Server) Start() error {
+	err := s.init()
 	if err != nil {
 		return err
 	}
 
-	s.logger.Info(fmt.Sprintf(
-		"server listening on: %s, with maximum number of connections: %d", s.addr, s.MaxOpenConnNums(),
-	))
-	s.listener, s.isRunning = listener, true // 修改TCP运行状态
+	go s.proc() // 异步非阻塞运行
+	return nil
+}
 
-	for s.isRunning {
-		conn, err := listener.Accept() // 等待连接
-		if err != nil {
-			continue
-		}
-
-		s.lock.Lock() // 建立连接时禁止并发
-
-		if s.GetOpenConnNums() < s.MaxOpenConnNums() { // 为客户端建立连接, 此时一定存在空闲槽位
-			for i := 0; i < s.MaxOpenConnNums(); i++ {
-				remote := s.remotes[i]
-				if remote.conn != nil {
-					continue
-				}
-
-				// 发现空闲槽位，接受客户端连接
-				remote.conn = conn
-				remote.addr = conn.RemoteAddr().String()
-
-				go s.process(remote) // 对每个新连接创建一个协程进行连接处理
-				break
-			}
-		} else { // 达到最大连接数量限制
-			s.logger.Warn("reached the upper limit, closed: " + conn.RemoteAddr().String())
-			_ = conn.Close()
-		}
-
-		s.lock.Unlock()
+// Serve 阻塞式启动TCP服务，若服务已在运行则返回错误信息
+func (s *Server) Serve() error {
+	err := s.init()
+	if err != nil {
+		return err
 	}
+
+	s.proc() // 阻塞运行
 	return nil
 }
 
@@ -312,7 +342,7 @@ func (s *Server) process(r *Remote) {
 		s.logger.Error(r.addr+": error on accept, ", err.Error())
 	}
 
-	for s.isRunning { // 处理通信中任务
+	for s.isRunning.Load() { // 处理通信中任务
 		err := r.readMessage()
 		if err != nil {
 			break
@@ -338,6 +368,7 @@ type TcpsConfig struct {
 	MaxOpenConn    int    `json:"max_open_conn"`
 }
 
+// NewTcpServer 创建一个TCP server，此处未主动运行，需手动 Server.Start 启动服务
 func NewTcpServer(c ...*TcpsConfig) *Server {
 	var s *Server
 
@@ -426,12 +457,10 @@ func NewAsyncTcpServer(c ...*TcpsConfig) *Server {
 	var s *Server
 	s = NewTcpServer(c...)
 
-	go func() {
-		err := s.Serve()
-		if err != nil {
-			s.logger.Error("Server started failed: ", err.Error())
-		}
-	}()
+	err := s.Start()
+	if err != nil {
+		s.logger.Error("Server started failed: ", err.Error())
+	}
 
 	return s
 }
