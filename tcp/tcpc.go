@@ -182,7 +182,7 @@ func NewTcpClient(c ...*TcpcConfig) *Client {
 			},
 			handler:        c[0].MessageHandler,
 			reconnect:      c[0].Reconnect,
-			reconnectDelay: c[0].ReconnectDelay,
+			reconnectDelay: c[0].ReconnectDelay * time.Second,
 			isRunning:      &atomic.Bool{},
 		}
 	}
