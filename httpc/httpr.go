@@ -13,48 +13,105 @@ import (
 )
 
 type Opt struct {
-	Url            string
-	ContextType    string
-	Query          map[string]string
-	RequestModel   any
-	ResponseModel  any
+	// 对于作为 DoRequest 函数参数时，其为请求路由后缀，对于返回值而言，其为包含了域名及路由参数等的全路径
+	Url string
+	// 请求体的表单类型，默认为 application/json
+	ContextType string
+	// 查询参数
+	Query map[string]string
+	// 请求体模型, 会结合 ContextType 对其序列化后设置到请求体内
+	RequestModel any
+	// 相应体模型, 若请求成功,则会尝试反序列化,默认为 map[string]any
+	ResponseModel any
+	// 是否禁用返回值自动序列化
 	DisableMarshal bool
-	Timeout        time.Duration
-	Ctx            context.Context
-	Err            error
-	StatusCode     int
+	// 请求的默认超时时间
+	Timeout time.Duration
+	// 父context
+	Ctx    context.Context
+	Cancel context.CancelFunc
+	// 依据处理步骤, 其可能为请求错误, 也可能为返回错误
+	Err error
+	// 响应状态码
+	StatusCode int
+	// (最后调用)在请求发起之前可自行添加操作
+	ReqHook func(req *http.Request)
+	// (最先调用)在返回值被处理之前可自行添加操作
+	RespHook func(resp *http.Response)
+	req      *http.Request
+	resp     *http.Response
+}
+
+func (o Opt) IsOK() bool {
+	return o.Err == nil && http.StatusOK <= o.StatusCode && o.StatusCode <= http.StatusIMUsed
 }
 
 // Httpr http 请求客户端
-// 请求地址默认前缀为"/api", 若不是,需在实例化结构体之后，通过"SetUrlPrefix()"显式更改路由前缀
-// 请求的默认超时时间15s, 通过"SetTimeout()"显式更改
+// 请求地址默认前缀为"/api", 若不是,需在实例化结构体之后，通过 SetUrlPrefix 显式更改路由前缀
+// 请求的默认超时时间15s, 通过 SetTimeout 显式更改
 type Httpr struct {
 	Host    string `json:"host"`
 	Port    string `json:"port"`
+	ctx     context.Context
 	client  *http.Client
 	logger  logger.Iface
-	prefix  string
+	prefix  string // 请求路由前缀，以/结尾
 	timeout time.Duration
-	i       bool
 }
 
-// makePrefix组合前缀，形如："http://127.0.0.1:3306/api/"
+// 组合路由，形如："http://127.0.0.1:3306/api/suffix"
 //
 //	@param	prefix	string	地址前缀
-func (h *Httpr) makePrefix(prefix string) *Httpr {
-	// noinspection HttpUrlsUsage
-	h.prefix = helper.F(
-		"http://", h.Host, ":", h.Port, "/", strings.TrimPrefix(prefix, "/"), "/",
-	)
+func (h *Httpr) cUrl(suffix string) string {
+	if h.prefix == "" {
+		h.SetUrlPrefix("")
+	}
 
-	return h
+	return h.prefix + strings.TrimPrefix(suffix, "/")
+}
+
+func (h *Httpr) cleanOpt(opts ...*Opt) *Opt {
+	var opt *Opt
+
+	if len(opts) > 0 {
+		opt = opts[0]
+	} else {
+		opt = &Opt{}
+	}
+
+	if opt.ContextType == "" {
+		opt.ContextType = "application/json"
+	}
+	if opt.Query == nil {
+		opt.Query = map[string]string{}
+	}
+	if opt.RequestModel == nil {
+		opt.RequestModel = []byte{}
+	}
+	if opt.ResponseModel == nil {
+		opt.ResponseModel = map[string]any{}
+	}
+	if opt.Timeout == 0 {
+		opt.Timeout = h.timeout
+	}
+	if opt.Ctx == nil {
+		opt.Ctx, opt.Cancel = context.WithTimeout(h.ctx, h.timeout)
+	}
+	if opt.ReqHook == nil {
+		opt.ReqHook = func(req *http.Request) {}
+	}
+	if opt.RespHook == nil {
+		opt.RespHook = func(resp *http.Response) {}
+	}
+
+	return opt
 }
 
 // SetTimeout 设置请求的超时时间，单位s
 //
 //	@param	timeout	int	超时时间(s)
-func (h *Httpr) SetTimeout(timeout int) *Httpr {
-	h.timeout = time.Duration(timeout) * time.Second
+func (h *Httpr) SetTimeout(timeout time.Duration) *Httpr {
+	h.timeout = timeout
 	return h
 }
 
@@ -68,114 +125,140 @@ func (h *Httpr) SetLogger(logger logger.Iface) *Httpr {
 //
 //	@param	prefix	string	地址前缀
 func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
-	// 重写现有的路由前缀
-	h.makePrefix(strings.TrimSuffix(prefix, "/"))
+	// noinspection HttpUrlsUsage
+	h.prefix = helper.F(
+		"http://", h.Host, ":", h.Port,
+		"/", strings.TrimPrefix(prefix, "/"), "/",
+	)
 	return h
-}
-
-func (h *Httpr) cleanOpt(opts ...Opt) *Opt {
-	return &Opt{}
 }
 
 // DoRequest 发起网络请求
 //
 //	@param	method	string				请求方法，取值为GET/POST/PATCH/PUT/DELETE
 //	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-func (h *Httpr) DoRequest(method, url string, opts ...Opt) *Opt {
-	opt := h.cleanOpt()
-	var req *http.Request
-	var reqBody []byte
-	var err error
+func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
+	opt := h.cleanOpt(opts...)
+	// 释放资源
+	defer func() {
+		if opt.resp != nil && opt.resp.Body != nil {
+			_ = opt.resp.Body.Close()
+		}
+		if opt.Cancel != nil {
+			opt.Cancel()
+		}
+		opt.req = nil
+		opt.resp = nil
+	}()
 
+	// 必须首先设置请求路由
+	// 请求参数具有更高的优先级
+	if url != "" {
+		opt.Url = url
+	}
+	opt.Url = h.cUrl(opt.Url)
+
+	// -------------------------------------------------------------------
+	// 请求体设置
+	var reqBody []byte
 	switch opt.RequestModel.(type) {
 	case []byte:
 		reqBody = opt.RequestModel.([]byte)
 	default:
-		reqBody, err = helper.JsonMarshal(opt.RequestModel)
+		reqBody, opt.Err = helper.JsonMarshal(opt.RequestModel)
 	}
-	if err != nil {
+
+	if opt.Err != nil {
 		opt.StatusCode = 0
 		opt.Err = errors.New("marshal body error")
 		return opt
 	}
 
+	// 依据请求方法构建http请求
 	switch method {
 	case http.MethodPost:
-		req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPost, opt.Url, bytes.NewReader(reqBody))
+		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPost, opt.Url, bytes.NewReader(reqBody))
 	case http.MethodPut:
-		req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPut, opt.Url, bytes.NewReader(reqBody))
+		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPut, opt.Url, bytes.NewReader(reqBody))
 	case http.MethodPatch:
-		req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPatch, opt.Url, bytes.NewReader(reqBody))
+		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodPatch, opt.Url, bytes.NewReader(reqBody))
 	case http.MethodDelete:
-		req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodDelete, opt.Url, nil)
+		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodDelete, opt.Url, nil)
 	default:
-		req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodGet, opt.Url, nil)
+		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodGet, opt.Url, nil)
 	}
-	for range opt.Query {
+	// 设置请求的Content-Type为application/json
+	opt.req.Header.Set("Content-Type", opt.ContextType)
 
+	// -------------------------------------------------------------------
+	// 设置路由参数
+	// 将现有的查询参数解析为 url.Values
+	query := opt.req.URL.Query()
+	// 添加新的查询参数
+	for key, value := range opt.Query {
+		query.Add(key, value)
 	}
-	h.client.Do(req)
+
+	// 重新编码查询参数并设置到请求的 URL 中
+	fullUrl := query.Encode()
+	opt.req.URL.RawQuery = fullUrl
+	opt.Url = fullUrl
+
+	// 执行发送前钩子
+	opt.ReqHook(opt.req)
+
+	// -------------------------------------------------------------------
+	// 发起网络请求
+	opt.resp, opt.Err = h.client.Do(opt.req)
+
+	if opt.Err != nil {
+		return nil
+	}
+
+	// 请求成功，首先执行 RespHook
+	opt.StatusCode = opt.resp.StatusCode
+	opt.RespHook(opt.resp)
+	// 序列化返回值
+	if opt.IsOK() {
+		opt.Err = helper.DefaultJson.NewDecoder(opt.resp.Body).Decode(opt.resp)
+	}
 
 	return opt
 }
 
-// Get 发起一个带查询参数的Get请求
-//
-//	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-func (h *Httpr) Get(url string, opts ...Opt) *Opt {
-	return h.DoRequest("GET", url, opts...)
+// Get 发起一个Get请求
+func (h *Httpr) Get(path string, opts ...*Opt) *Opt {
+	return h.DoRequest("GET", path, opts...)
 }
 
 // Post 发起一个Post请求
-//
-//	@param	url		string			路由地址
-func (h *Httpr) Post(url string, opts ...Opt) *Opt {
-	return h.DoRequest("POST", url, opts...)
+func (h *Httpr) Post(path string, opts ...*Opt) *Opt {
+	return h.DoRequest("POST", path, opts...)
 }
 
 // Put 发起一个Put请求
-//
-//	@param	url		string			路由地址
-func (h *Httpr) Put(url string, opts ...Opt) *Opt {
-	return h.DoRequest("PUT", url, opts...)
+func (h *Httpr) Put(path string, opts ...*Opt) *Opt {
+	return h.DoRequest("PUT", path, opts...)
 }
 
 // Patch 发起一个Patch请求
-//
-//	@param	url		string			路由地址
-func (h *Httpr) Patch(url string, opts ...Opt) *Opt {
-	return h.DoRequest("PATCH", url, opts...)
+func (h *Httpr) Patch(path string, opts ...*Opt) *Opt {
+	return h.DoRequest("PATCH", path, opts...)
 }
 
 // Delete  发起一个Delete请求
-//
-//	@param	url	string	路由地址
-func (h *Httpr) Delete(url string, opts ...Opt) *Opt {
-	return h.DoRequest("DELETE", url, opts...)
+func (h *Httpr) Delete(path string, opts ...*Opt) *Opt {
+	return h.DoRequest("DELETE", path, opts...)
 }
 
 // NewHttpr 创建一个新的HTTP请求基类
-//
-//	#  Usage:
-//
-//	client := NewHttpr("localhost", "8080", 5, logger)
-//	resp, err := client.Get("/clipboard", map[string]string{})
-//	if err != nil {
-//		return "", err
-//	}
-//	text := ""
-//	err = client.UnmarshalJson(resp, &text)
-//	if err != nil {
-//		return "", err
-//	}
-//	return text, nil
-func NewHttpr(host, port string, timeout int, logger logger.Iface) (*Httpr, error) {
+func NewHttpr(host, port string) (*Httpr, error) {
 	if host == "" || port == "" {
 		return nil, errors.New("host and port cannot be empty")
 	}
 
 	r := &Httpr{Host: host, Port: port, client: &http.Client{}}
-	r.SetTimeout(timeout).SetLogger(logger)
+	r.SetTimeout(time.Second * 15).SetLogger(logger.NewDefaultLogger())
 
 	return r, nil
 }
