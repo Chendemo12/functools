@@ -7,16 +7,27 @@ import (
 	"errors"
 	"github.com/Chendemo12/fastapi-tool/helper"
 	"github.com/Chendemo12/functools/logger"
+	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 )
 
+type ContentType string
+
+const (
+	JsonContentType ContentType = "application/json"
+)
+
+var ErrRespUnmarshal = errors.New("response unmarshal error")
+var ErrReadResponse = errors.New("read response error")
+
 type Opt struct {
 	// 对于作为 DoRequest 函数参数时，其为请求路由后缀，对于返回值而言，其为包含了域名及路由参数等的全路径
 	Url string
-	// 请求体的表单类型，默认为 application/json
-	ContextType string
+	// 请求体的表单类型，默认为 application/json, 目前(230725)仅支持 application/json
+	ContextType ContentType
 	// 查询参数
 	Query map[string]string
 	// 请求体模型, 会结合 ContextType 对其序列化后设置到请求体内
@@ -42,8 +53,58 @@ type Opt struct {
 	resp     *http.Response
 }
 
+// IsOK 请求是否成功
 func (o Opt) IsOK() bool {
-	return o.Err == nil && http.StatusOK <= o.StatusCode && o.StatusCode <= http.StatusIMUsed
+	return http.StatusOK <= o.StatusCode && o.StatusCode <= http.StatusIMUsed
+}
+
+// ErrorOccurred 是否发送错误
+func (o Opt) ErrorOccurred() bool { return o.Err != nil }
+
+// IsUnmarshalError 是否是反序列化错误, 对于请求发起之前代表请求体反序列化错误
+// 请求成功之后为响应体反序列化错误
+func (o Opt) IsUnmarshalError() bool {
+	if o.resp != nil { // 响应体反序列化
+		if o.DisableMarshal {
+			return false
+		}
+		return errors.Is(o.Err, ErrRespUnmarshal)
+	} else { // 请求体反序列化错误
+		return o.Err != nil
+	}
+}
+
+// IsTimeout 判断是否是因为超时引发的错误
+func (o Opt) IsTimeout() bool {
+	if !o.IsOK() {
+		var err net.Error
+		ok := errors.As(o.Err, &err)
+		if ok {
+			return err.Timeout()
+		}
+	}
+
+	return false
+}
+
+// IsConnectError 是否是请求发起错误
+func (o Opt) IsConnectError() bool {
+	if !o.IsOK() {
+		var opErr *net.OpError
+		if errors.As(o.Err, &opErr) && opErr.Op == "dial" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsReadResponseError 读取返回体是否出错
+func (o Opt) IsReadResponseError() bool {
+	if o.IsOK() {
+		return false
+	}
+	return errors.Is(o.Err, ErrReadResponse)
 }
 
 // Httpr http 请求客户端
@@ -80,7 +141,7 @@ func (h *Httpr) cleanOpt(opts ...*Opt) *Opt {
 	}
 
 	if opt.ContextType == "" {
-		opt.ContextType = "application/json"
+		opt.ContextType = JsonContentType
 	}
 	if opt.Query == nil {
 		opt.Query = map[string]string{}
@@ -89,7 +150,7 @@ func (h *Httpr) cleanOpt(opts ...*Opt) *Opt {
 		opt.RequestModel = []byte{}
 	}
 	if opt.ResponseModel == nil {
-		opt.ResponseModel = map[string]any{}
+		opt.ResponseModel = []byte{}
 	}
 	if opt.Timeout == 0 {
 		opt.Timeout = h.timeout
@@ -135,10 +196,10 @@ func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 
 // DoRequest 发起网络请求
 //
-//	@param	method	string				请求方法，取值为GET/POST/PATCH/PUT/DELETE
-//	@param	url		string				路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
-	opt := h.cleanOpt(opts...)
+//	@param	method	string		请求方法，取值为GET/POST/PATCH/PUT/DELETE
+//	@param	url		string		路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
+func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
+	opt = h.cleanOpt(opts...)
 	// 释放资源
 	defer func() {
 		if opt.resp != nil && opt.resp.Body != nil {
@@ -156,7 +217,12 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
 	if url != "" {
 		opt.Url = url
 	}
-	opt.Url = h.cUrl(opt.Url)
+
+	// 对于绝对路由则不拼接
+	// noinspection HttpUrlsUsage
+	if !strings.HasPrefix(opt.Url, "http://") && !strings.HasPrefix(opt.Url, "https://") {
+		opt.Url = h.cUrl(opt.Url)
+	}
 
 	// -------------------------------------------------------------------
 	// 请求体设置
@@ -165,13 +231,15 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
 	case []byte:
 		reqBody = opt.RequestModel.([]byte)
 	default:
-		reqBody, opt.Err = helper.JsonMarshal(opt.RequestModel)
+		if opt.ContextType == JsonContentType {
+			reqBody, opt.Err = helper.JsonMarshal(opt.RequestModel)
+		}
 	}
 
 	if opt.Err != nil {
 		opt.StatusCode = 0
-		opt.Err = errors.New("marshal body error")
-		return opt
+		opt.Err = errors.New("request-body marshal error")
+		return
 	}
 
 	// 依据请求方法构建http请求
@@ -188,7 +256,7 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
 		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodGet, opt.Url, nil)
 	}
 	// 设置请求的Content-Type为application/json
-	opt.req.Header.Set("Content-Type", opt.ContextType)
+	opt.req.Header.Set("Content-Type", string(opt.ContextType))
 
 	// -------------------------------------------------------------------
 	// 设置路由参数
@@ -200,9 +268,8 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
 	}
 
 	// 重新编码查询参数并设置到请求的 URL 中
-	fullUrl := query.Encode()
-	opt.req.URL.RawQuery = fullUrl
-	opt.Url = fullUrl
+	opt.req.URL.RawQuery = query.Encode()
+	opt.Url = opt.req.URL.String()
 
 	// 执行发送前钩子
 	opt.ReqHook(opt.req)
@@ -210,20 +277,31 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) *Opt {
 	// -------------------------------------------------------------------
 	// 发起网络请求
 	opt.resp, opt.Err = h.client.Do(opt.req)
-
-	if opt.Err != nil {
-		return nil
+	if opt.Err != nil { // 网络请求失败
+		return
 	}
 
 	// 请求成功，首先执行 RespHook
 	opt.StatusCode = opt.resp.StatusCode
 	opt.RespHook(opt.resp)
-	// 序列化返回值
-	if opt.IsOK() {
-		opt.Err = helper.DefaultJson.NewDecoder(opt.resp.Body).Decode(opt.resp)
+
+	if !opt.IsOK() { // 但是状态码为错误码，不再进行响应体处理
+		return
 	}
 
-	return opt
+	// 请求成功，序列化返回值
+	_bytes, err := io.ReadAll(opt.resp.Body)
+	if err != nil { // 读取返回值错误
+		opt.Err = errors.Join(ErrReadResponse, err)
+	} else {
+		if !opt.DisableMarshal { // 响应体反序列化, 返回响应体
+			opt.Err = helper.JsonUnmarshal(_bytes, opt.ResponseModel)
+		} else {
+			opt.ResponseModel = _bytes
+		}
+	}
+
+	return
 }
 
 // Get 发起一个Get请求
@@ -257,7 +335,7 @@ func NewHttpr(host, port string) (*Httpr, error) {
 		return nil, errors.New("host and port cannot be empty")
 	}
 
-	r := &Httpr{Host: host, Port: port, client: &http.Client{}}
+	r := &Httpr{Host: host, Port: port, client: &http.Client{}, ctx: context.Background()}
 	r.SetTimeout(time.Second * 15).SetLogger(logger.NewDefaultLogger())
 
 	return r, nil
