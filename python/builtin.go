@@ -2,10 +2,6 @@
 package python
 
 import (
-	"reflect"
-	"strconv"
-
-	"github.com/Chendemo12/fastapi-tool/helper"
 	"github.com/Chendemo12/functools/types"
 )
 
@@ -30,103 +26,6 @@ func All(args ...bool) bool {
 		}
 	}
 	return true
-}
-
-// Repr 格式化显示对象
-// 将任意对象输出为字符串格式，内部对struct,map,array,string,error实现了string的格式化转换
-//
-//	number -> number
-//	bool -> "true" or "false"
-//	array -> "0d 56 f6";
-//	map -> json;
-//	struct -> StructName({json});
-//	error -> error.Error();
-//
-//	@param	object		any		需要格式化显示的对象
-//	@param	excludeName	bool	不显示对象名称,	针对struct有效
-//	@return	string ObjectName(...)
-func Repr(object any, excludeName ...bool) (message string) {
-	if object == nil {
-		message = ""
-	}
-	switch object.(type) {
-	// 数值类型
-	case int8:
-		message = strconv.FormatInt(int64(object.(int8)), 10)
-	case int16:
-		message = strconv.FormatInt(int64(object.(int16)), 10)
-	case int32:
-		message = strconv.FormatInt(int64(object.(int32)), 10)
-	case int:
-		message = strconv.FormatInt(int64(object.(int)), 10)
-	case int64:
-		message = strconv.FormatInt(object.(int64), 10)
-
-	case uint8:
-		message = strconv.FormatUint(uint64(object.(uint8)), 10)
-	case uint16:
-		message = strconv.FormatUint(uint64(object.(uint16)), 10)
-	case uint32:
-		message = strconv.FormatUint(uint64(object.(uint32)), 10)
-	case uint:
-		message = strconv.FormatUint(uint64(object.(uint)), 10)
-	case uint64:
-		message = strconv.FormatUint(object.(uint64), 10)
-
-	case float32:
-		message = strconv.FormatFloat(float64(object.(float32)), 'f', -1, 64)
-	case float64:
-		message = strconv.FormatFloat(object.(float64), 'f', -1, 64)
-
-	// 字符串类型
-	case string:
-		message = object.(string)
-	case bool:
-		if object.(bool) {
-			message = "true"
-		} else {
-			message = "false"
-		}
-
-	// 数组类型
-	case []string:
-		message = helper.CombineStrings(object.([]string)...)
-	case []byte:
-		message = helper.HexBeautify(object.([]byte))
-
-	// 其他类型
-	case error:
-		message = object.(error).Error()
-	case uintptr:
-		message = "uintptr"
-
-	default: // 复杂的自定义类型
-		ex := Any(excludeName...) // 是否排除对象名
-		if !ex {                  // 不排除对象名
-			name := ""
-			at := reflect.TypeOf(object)
-			switch at.Kind() {
-			case reflect.Pointer: // 指针类型,结构体类型
-				name = at.Elem().Name()
-			case reflect.Struct:
-				name = at.Name()
-			}
-
-			bs, err := helper.JsonMarshal(&object)
-			if err != nil {
-				message = name
-			} else {
-				message = helper.CombineStrings(name, "(", helper.B2S(bs), ")")
-			}
-		} else {
-			bytes, err := helper.JsonMarshal(object)
-			if err != nil {
-				message = ""
-			}
-			message = helper.B2S(bytes)
-		}
-	}
-	return
 }
 
 // Max 计算列表内部的最大元素, 需确保目标列表不为空

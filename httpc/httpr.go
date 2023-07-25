@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"github.com/Chendemo12/fastapi-tool/helper"
-	"github.com/Chendemo12/functools/logger"
 	"io"
 	"net"
 	"net/http"
@@ -115,7 +114,6 @@ type Httpr struct {
 	Port    string `json:"port"`
 	ctx     context.Context
 	client  *http.Client
-	logger  logger.Iface
 	prefix  string // 请求路由前缀，以/结尾
 	timeout time.Duration
 }
@@ -173,12 +171,6 @@ func (h *Httpr) cleanOpt(opts ...*Opt) *Opt {
 //	@param	timeout	int	超时时间(s)
 func (h *Httpr) SetTimeout(timeout time.Duration) *Httpr {
 	h.timeout = timeout
-	return h
-}
-
-// SetLogger 自定义请求日志
-func (h *Httpr) SetLogger(logger logger.Iface) *Httpr {
-	h.logger = logger
 	return h
 }
 
@@ -336,7 +328,7 @@ func NewHttpr(host, port string) (*Httpr, error) {
 	}
 
 	r := &Httpr{Host: host, Port: port, client: &http.Client{}, ctx: context.Background()}
-	r.SetTimeout(time.Second * 15).SetLogger(logger.NewDefaultLogger())
+	r.SetTimeout(time.Second * 15)
 
 	return r, nil
 }

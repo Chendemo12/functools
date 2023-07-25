@@ -3,7 +3,6 @@ package cprint
 
 import (
 	"github.com/Chendemo12/fastapi-tool/helper"
-	"github.com/Chendemo12/functools/python"
 	"os"
 )
 
@@ -34,13 +33,4 @@ func Green(message string) {
 }
 func Fuchsia(message string) {
 	_, _ = os.Stdout.WriteString(helper.CombineStrings(fuchsia, message, EndLn))
-}
-
-func FWhite(message string, object any)  { White(helper.CombineStrings(message, python.Repr(object))) }
-func FBlue(message string, object any)   { Blue(helper.CombineStrings(message, python.Repr(object))) }
-func FRed(message string, object any)    { Red(helper.CombineStrings(message, python.Repr(object))) }
-func FYellow(message string, object any) { Yellow(helper.CombineStrings(message, python.Repr(object))) }
-func FGreen(message string, object any)  { Green(helper.CombineStrings(message, python.Repr(object))) }
-func FFuchsia(message string, object any) {
-	Fuchsia(helper.CombineStrings(message, python.Repr(object)))
 }

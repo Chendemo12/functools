@@ -1,13 +1,13 @@
-package example
+package kafkac
 
 import (
 	"fmt"
-	"github.com/Chendemo12/functools/kafkac"
+	"testing"
 	"time"
 )
 
-func Example_KafkaClient_NewAsyncProducer() {
-	kc := kafkac.KafkaClient{
+func TestKafkaClient_NewProducer(t *testing.T) {
+	kc := KafkaClient{
 		Addrs:   []string{"10.64.5.70:30095", "10.64.5.70:30094"},
 		GroupId: "FLYING",
 	}

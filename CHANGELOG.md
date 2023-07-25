@@ -1,6 +1,12 @@
 # CHANGELOG
 
-## 0.1.32 - (2023072)
+## 0.2.0 - (20230725)
+
+### BREAKING
+
+- 删除`logger`，`cronjob`, `httpr.logger`
+
+## 0.1.32 - (20230725)
 
 ### Feat
 

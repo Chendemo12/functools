@@ -3,7 +3,7 @@ package tcp
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/Chendemo12/functools/logger"
+	"github.com/Chendemo12/fastapi-tool/logger"
 	"io"
 	"net"
 	"sync"
