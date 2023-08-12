@@ -108,3 +108,37 @@ func Has[T comparable](s []T, x T) bool {
 	}
 	return false
 }
+
+func Lambda[T any](cond bool, x, y T) T {
+	if cond {
+		return x
+	}
+	return y
+}
+
+// GetS 如果x不为空，则返回x,反之返回y
+func GetS(x, y string) string {
+	if x != "" {
+		return x
+	}
+
+	return y
+}
+
+// GetI 如果x不为0，则返回x,反之返回y
+func GetI[T types.Integer](x, y T) T {
+	if x != 0 {
+		return x
+	}
+
+	return y
+}
+
+// GetF 如果x不为0，则返回x,反之返回y
+func GetF[T types.Number](x, y T) T {
+	if x != 0.0 {
+		return x
+	}
+
+	return y
+}

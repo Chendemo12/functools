@@ -125,16 +125,17 @@ func (l ConnLimit) Execute() error {
 
 // Server tcp 服务端实现
 type Server struct {
-	handler   HandlerFunc     `description:"消息处理方法"`
-	logger    logger.Iface    `description:"日志"`
-	listener  net.Listener    `description:"listener"`
-	lock      *sync.Mutex     `description:"连接建立和释放时加锁"`
-	wg        *sync.WaitGroup `description:"广播任务"`
-	addr      string          `description:"工作地址"`
-	byteOrder string          `description:"消息长度字节序"`
-	remotes   []*Remote       `description:"客户端连接"`
-	limit     *ConnLimit      `description:"连接限制"`
-	isRunning *atomic.Bool    `description:"是否正在运行"`
+	handler      HandlerFunc     `description:"消息处理方法"`
+	logger       logger.Iface    `description:"日志"`
+	listener     net.Listener    `description:"listener"`
+	lock         *sync.Mutex     `description:"连接建立和释放时加锁"`
+	wg           *sync.WaitGroup `description:"广播任务"`
+	addr         string          `description:"工作地址"`
+	byteOrder    string          `description:"消息长度字节序"`
+	remotes      []*Remote       `description:"客户端连接"`
+	limit        *ConnLimit      `description:"连接限制"`
+	iptableLimit bool            `description:"是否开启IPTABLE限制"`
+	isRunning    *atomic.Bool    `description:"是否正在运行"`
 }
 
 func (s *Server) init() error {
@@ -155,19 +156,20 @@ func (s *Server) init() error {
 			byteOrder: s.byteOrder,
 			rxEnd:     headerLength,
 			txEnd:     headerLength,
-			rx:        make([]byte, bufLength, bufLength),
-			tx:        make([]byte, bufLength, bufLength),
+			rx:        make([]byte, bufLength),
+			tx:        make([]byte, bufLength),
 			lock:      &sync.Mutex{},
 		}
 	}
 
-	// 设置限制
-	s.logger.Info("limit cmd: " + s.limit.String())
-	err := s.limit.Execute()
-	if err != nil {
-		s.logger.Warn("executed failed, err: " + err.Error())
-	} else {
-		s.logger.Info("iptables limit executed successfully")
+	// 设置 iptable 限制
+	if s.iptableLimit {
+		s.logger.Info("limit cmd: " + s.limit.String())
+		if err := s.limit.Execute(); err != nil {
+			s.logger.Warn("executed failed, err: " + err.Error())
+		} else {
+			s.logger.Info("iptables limit executed successfully")
+		}
 	}
 
 	// 使用 net.Listen 监听连接的地址与端口
@@ -177,7 +179,7 @@ func (s *Server) init() error {
 	}
 
 	s.logger.Info(fmt.Sprintf(
-		"server listening on: %s, with maximum number of connections: %d", s.addr, s.MaxOpenConnNums(),
+		"server listening on: %s, with limit: %d", s.addr, s.MaxOpenConnNums(),
 	))
 	s.listener = listener // 修改TCP运行状态
 	s.isRunning.Store(true)
@@ -286,6 +288,27 @@ func (s *Server) Broadcast(msg []byte) int {
 	return num
 }
 
+// Close 依据连接地址关闭一个远端连接;
+// 若连接已关闭，则不做任何操作，若连接处于活动状态下，此操作执行完成总后会触发 OnClosed 回调
+func (s *Server) Close(addr string) error {
+	if addr == "" { // do nothing
+		return nil
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for i := 0; i < s.MaxOpenConnNums(); i++ {
+		r := s.remotes[i]
+		if r.addr == addr {
+			// 当连接被关闭后，process 函数将遇错退出，OnClosed回调将被自动触发
+			return r.conn.Close()
+		}
+	}
+
+	return nil
+}
+
 // Stop 停止并关闭全部TCP连接
 func (s *Server) Stop() {
 	if !s.IsRunning() { // 服务未启动
@@ -343,7 +366,7 @@ func (s *Server) process(r *Remote) {
 	}
 
 	for s.isRunning.Load() { // 处理通信中任务
-		err := r.readMessage()
+		err = r.readMessage()
 		if err != nil {
 			break
 		}
@@ -366,6 +389,7 @@ type TcpsConfig struct {
 	Port           string `json:"tcps_port"`
 	ByteOrder      string `json:"byte_order"`
 	MaxOpenConn    int    `json:"max_open_conn"`
+	IptableLimit   bool   `json:"iptable_limit"` // 是否开启IPTABLE限制
 }
 
 // NewTcpServer 创建一个TCP server，此处未主动运行，需手动 Server.Start 启动服务
@@ -374,31 +398,33 @@ func NewTcpServer(c ...*TcpsConfig) *Server {
 
 	if len(c) == 0 {
 		s = &Server{
-			byteOrder: defaultsConfig.ByteOrder,
-			handler:   defaultsConfig.MessageHandler,
-			logger:    defaultsConfig.Logger,
-			addr:      net.JoinHostPort(defaultsConfig.Host, defaultsConfig.Port),
-			limit: &ConnLimit{
-				num:   defaultsConfig.MaxOpenConn,
-				proto: "tcp",
-				dport: defaultsConfig.Port,
-				dst:   "",
-				src:   "",
-			},
+			byteOrder:    defaultsConfig.ByteOrder,
+			handler:      defaultsConfig.MessageHandler,
+			logger:       defaultsConfig.Logger,
+			addr:         net.JoinHostPort(defaultsConfig.Host, defaultsConfig.Port),
+			iptableLimit: false,
+		}
+		s.limit = &ConnLimit{
+			num:   defaultsConfig.MaxOpenConn,
+			proto: "tcp",
+			dport: defaultsConfig.Port,
+			dst:   "",
+			src:   "",
 		}
 	} else {
 		s = &Server{
-			byteOrder: c[0].ByteOrder,
-			handler:   c[0].MessageHandler,
-			logger:    c[0].Logger,
-			addr:      net.JoinHostPort(c[0].Host, c[0].Port),
-			limit: &ConnLimit{
-				num:   c[0].MaxOpenConn,
-				proto: "tcp",
-				dport: c[0].Port,
-				dst:   "",
-				src:   "",
-			},
+			byteOrder:    c[0].ByteOrder,
+			handler:      c[0].MessageHandler,
+			logger:       c[0].Logger,
+			addr:         net.JoinHostPort(c[0].Host, c[0].Port),
+			iptableLimit: c[0].IptableLimit,
+		}
+		s.limit = &ConnLimit{
+			num:   c[0].MaxOpenConn,
+			proto: "tcp",
+			dport: c[0].Port,
+			dst:   "",
+			src:   "",
 		}
 	}
 	s.lock, s.wg = &sync.Mutex{}, &sync.WaitGroup{}
