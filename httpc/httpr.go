@@ -179,10 +179,13 @@ func (h *Httpr) SetTimeout(timeout time.Duration) *Httpr {
 //	@param	prefix	string	地址前缀
 func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
 	// noinspection HttpUrlsUsage
-	h.prefix = helper.F(
-		"http://", h.Host, ":", h.Port,
-		"/", strings.TrimPrefix(prefix, "/"), "/",
-	)
+	if prefix != "" {
+		h.prefix = helper.F(
+			"http://", h.Host, ":", h.Port, "/", strings.TrimPrefix(prefix, "/"), "/",
+		)
+	} else {
+		h.prefix = "http://" + h.Host + ":" + h.Port + "/"
+	}
 	return h
 }
 
