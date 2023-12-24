@@ -3,7 +3,7 @@ package structfuncs
 
 import (
 	"errors"
-	"github.com/Chendemo12/fastapi-tool/helper"
+	"github.com/Chendemo12/functools/helper"
 	"reflect"
 	"unicode"
 )

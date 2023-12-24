@@ -7,9 +7,10 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"strconv"
+	"time"
 )
 
-const timeformat = "2006/01/02 15:04:05"
+const timeformat = time.DateTime
 
 const (
 	DEBUG    = zapcore.DebugLevel

@@ -3,7 +3,7 @@ package tcp
 import (
 	"errors"
 	"fmt"
-	"github.com/Chendemo12/fastapi-tool/logger"
+	"github.com/Chendemo12/functools/logger"
 	"math"
 	"net"
 	"os/exec"
