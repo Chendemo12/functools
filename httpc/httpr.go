@@ -5,34 +5,37 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/Chendemo12/functools/helper"
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
-type ContentType string
+var client = &http.Client{}
 
 const (
-	JsonContentType ContentType = "application/json"
+	JsonContentType string = "application/json"
 )
 
 var ErrRespUnmarshal = errors.New("response unmarshal error")
 var ErrReadResponse = errors.New("read response error")
 
-type Opt struct {
+// Opt 请求参数, T 为响应体类型
+type Opt[T any] struct {
 	// 对于作为 DoRequest 函数参数时，其为请求路由后缀，对于返回值而言，其为包含了域名及路由参数等的全路径
 	Url string
 	// 请求体的表单类型，默认为 application/json, 目前(230725)仅支持 application/json
-	ContextType ContentType
+	ContextType string
 	// 查询参数
 	Query map[string]string
 	// 请求体模型, 会结合 ContextType 对其序列化后设置到请求体内
 	RequestModel any
 	// 相应体模型, 若请求成功,则会尝试反序列化,默认为 map[string]any
-	ResponseModel any
+	ResponseModel T
+	// 相应体数据流
+	ResponseSteam []byte
 	// 是否禁用返回值自动序列化
 	DisableMarshal bool
 	// 请求的默认超时时间
@@ -45,24 +48,51 @@ type Opt struct {
 	// 响应状态码
 	StatusCode int
 	// (最后调用)在请求发起之前可自行添加操作
-	ReqHook func(req *http.Request)
+	ReqHook func(req *http.Request) error
 	// (最先调用)在返回值被处理之前可自行添加操作
-	RespHook func(resp *http.Response)
+	RespHook func(resp *http.Response) error
 	req      *http.Request
 	resp     *http.Response
 }
 
+func (o *Opt[T]) clean(ctx context.Context, timeout time.Duration) {
+	var data = new(T)
+	o.ResponseModel = *data
+
+	if o.ContextType == "" {
+		o.ContextType = JsonContentType
+	}
+	if o.Query == nil {
+		o.Query = map[string]string{}
+	}
+	if o.RequestModel == nil {
+		o.RequestModel = []byte{}
+	}
+	if o.Timeout == 0 {
+		o.Timeout = timeout
+	}
+	if o.Ctx == nil {
+		o.Ctx, o.Cancel = context.WithTimeout(ctx, timeout)
+	}
+	if o.ReqHook == nil {
+		o.ReqHook = func(req *http.Request) error { return nil }
+	}
+	if o.RespHook == nil {
+		o.RespHook = func(resp *http.Response) error { return nil }
+	}
+}
+
 // IsOK 请求是否成功
-func (o Opt) IsOK() bool {
+func (o *Opt[T]) IsOK() bool {
 	return http.StatusOK <= o.StatusCode && o.StatusCode <= http.StatusIMUsed
 }
 
 // ErrorOccurred 是否发送错误
-func (o Opt) ErrorOccurred() bool { return o.Err != nil }
+func (o *Opt[T]) ErrorOccurred() bool { return o.Err != nil }
 
 // IsUnmarshalError 是否是反序列化错误, 对于请求发起之前代表请求体反序列化错误
 // 请求成功之后为响应体反序列化错误
-func (o Opt) IsUnmarshalError() bool {
+func (o *Opt[T]) IsUnmarshalError() bool {
 	if o.resp != nil { // 响应体反序列化
 		if o.DisableMarshal {
 			return false
@@ -74,7 +104,7 @@ func (o Opt) IsUnmarshalError() bool {
 }
 
 // IsTimeout 判断是否是因为超时引发的错误
-func (o Opt) IsTimeout() bool {
+func (o *Opt[T]) IsTimeout() bool {
 	if !o.IsOK() {
 		var err net.Error
 		ok := errors.As(o.Err, &err)
@@ -87,7 +117,7 @@ func (o Opt) IsTimeout() bool {
 }
 
 // IsConnectError 是否是请求发起错误
-func (o Opt) IsConnectError() bool {
+func (o *Opt[T]) IsConnectError() bool {
 	if !o.IsOK() {
 		var opErr *net.OpError
 		if errors.As(o.Err, &opErr) && opErr.Op == "dial" {
@@ -99,102 +129,27 @@ func (o Opt) IsConnectError() bool {
 }
 
 // IsReadResponseError 读取返回体是否出错
-func (o Opt) IsReadResponseError() bool {
+func (o *Opt[T]) IsReadResponseError() bool {
 	if o.IsOK() {
 		return false
 	}
 	return errors.Is(o.Err, ErrReadResponse)
 }
 
-// Httpr http 请求客户端
-// 请求地址默认前缀为"/api", 若不是,需在实例化结构体之后，通过 SetUrlPrefix 显式更改路由前缀
-// 请求的默认超时时间15s, 通过 SetTimeout 显式更改
-type Httpr struct {
-	Host    string `json:"host"`
-	Port    string `json:"port"`
-	ctx     context.Context
-	client  *http.Client
-	prefix  string // 请求路由前缀，以/结尾
-	timeout time.Duration
-}
-
-// 组合路由，形如："http://127.0.0.1:3306/api/suffix"
+// DoRequest 发起网络请求
 //
-//	@param	prefix	string	地址前缀
-func (h *Httpr) cUrl(suffix string) string {
-	if h.prefix == "" {
-		h.SetUrlPrefix("")
-	}
-
-	return h.prefix + strings.TrimPrefix(suffix, "/")
-}
-
-func (h *Httpr) cleanOpt(opts ...*Opt) *Opt {
-	var opt *Opt
-
+//	@param	method	string	请求方法，取值为GET/POST/PATCH/PUT/DELETE
+//	@param	url		string	路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
+func DoRequest[T any](method, url string, opts ...*Opt[T]) *Opt[T] {
+	var opt *Opt[T]
 	if len(opts) > 0 {
 		opt = opts[0]
 	} else {
-		opt = &Opt{}
+		opt = &Opt[T]{}
 	}
 
-	if opt.ContextType == "" {
-		opt.ContextType = JsonContentType
-	}
-	if opt.Query == nil {
-		opt.Query = map[string]string{}
-	}
-	if opt.RequestModel == nil {
-		opt.RequestModel = []byte{}
-	}
-	if opt.ResponseModel == nil {
-		opt.ResponseModel = []byte{}
-	}
-	if opt.Timeout == 0 {
-		opt.Timeout = h.timeout
-	}
-	if opt.Ctx == nil {
-		opt.Ctx, opt.Cancel = context.WithTimeout(h.ctx, h.timeout)
-	}
-	if opt.ReqHook == nil {
-		opt.ReqHook = func(req *http.Request) {}
-	}
-	if opt.RespHook == nil {
-		opt.RespHook = func(resp *http.Response) {}
-	}
+	opt.clean(context.Background(), 15*time.Second)
 
-	return opt
-}
-
-// SetTimeout 设置请求的超时时间，单位s
-//
-//	@param	timeout	int	超时时间(s)
-func (h *Httpr) SetTimeout(timeout time.Duration) *Httpr {
-	h.timeout = timeout
-	return h
-}
-
-// SetUrlPrefix 设置地址前缀, 形如"/api"这样的路由前缀，以"/"开头并不以"/"结尾
-//
-//	@param	prefix	string	地址前缀
-func (h *Httpr) SetUrlPrefix(prefix string) *Httpr {
-	// noinspection HttpUrlsUsage
-	if prefix != "" {
-		h.prefix = helper.F(
-			"http://", h.Host, ":", h.Port, "/", strings.TrimPrefix(prefix, "/"), "/",
-		)
-	} else {
-		h.prefix = "http://" + h.Host + ":" + h.Port + "/"
-	}
-	return h
-}
-
-// DoRequest 发起网络请求
-//
-//	@param	method	string		请求方法，取值为GET/POST/PATCH/PUT/DELETE
-//	@param	url		string		路由地址，"url"形如"/tunnels/2"，以"/"开头并不以"/"结尾
-func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
-	opt = h.cleanOpt(opts...)
 	// 释放资源
 	defer func() {
 		if opt.resp != nil && opt.resp.Body != nil {
@@ -213,12 +168,6 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
 		opt.Url = url
 	}
 
-	// 对于绝对路由则不拼接
-	// noinspection HttpUrlsUsage
-	if !strings.HasPrefix(opt.Url, "http://") && !strings.HasPrefix(opt.Url, "https://") {
-		opt.Url = h.cUrl(opt.Url)
-	}
-
 	// -------------------------------------------------------------------
 	// 请求体设置
 	var reqBody []byte
@@ -234,7 +183,7 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
 	if opt.Err != nil {
 		opt.StatusCode = 0
 		opt.Err = errors.New("request-body marshal error")
-		return
+		return opt
 	}
 
 	// 依据请求方法构建http请求
@@ -250,8 +199,9 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
 	default:
 		opt.req, _ = http.NewRequestWithContext(opt.Ctx, http.MethodGet, opt.Url, nil)
 	}
-	// 设置请求的Content-Type为application/json
-	opt.req.Header.Set("Content-Type", string(opt.ContextType))
+
+	// 设置请求体的Content-Type
+	opt.req.Header.Set("Content-Type", opt.ContextType)
 
 	// -------------------------------------------------------------------
 	// 设置路由参数
@@ -267,71 +217,121 @@ func (h *Httpr) DoRequest(method, url string, opts ...*Opt) (opt *Opt) {
 	opt.Url = opt.req.URL.String()
 
 	// 执行发送前钩子
-	opt.ReqHook(opt.req)
+	opt.Err = opt.ReqHook(opt.req)
+	if opt.Err != nil {
+		return opt
+	}
 
 	// -------------------------------------------------------------------
 	// 发起网络请求
-	opt.resp, opt.Err = h.client.Do(opt.req)
+	opt.resp, opt.Err = client.Do(opt.req)
 	if opt.Err != nil { // 网络请求失败
-		return
+		return opt
 	}
 
 	// 请求成功，首先执行 RespHook
 	opt.StatusCode = opt.resp.StatusCode
-	opt.RespHook(opt.resp)
-
-	if !opt.IsOK() { // 但是状态码为错误码，不再进行响应体处理
-		return
+	opt.Err = opt.RespHook(opt.resp)
+	if opt.Err != nil {
+		return opt
 	}
 
-	// 请求成功，序列化返回值
-	_bytes, err := io.ReadAll(opt.resp.Body)
-	if err != nil { // 读取返回值错误
-		opt.Err = errors.Join(ErrReadResponse, err)
-	} else {
-		if !opt.DisableMarshal { // 响应体反序列化, 返回响应体
-			opt.Err = helper.JsonUnmarshal(_bytes, opt.ResponseModel)
-		} else {
-			opt.ResponseModel = _bytes
-		}
+	opt.ResponseSteam, opt.Err = io.ReadAll(opt.resp.Body)
+	if opt.Err != nil {
+		opt.Err = errors.Join(ErrReadResponse, opt.Err)
+		return opt
 	}
 
-	return
-}
-
-// Get 发起一个Get请求
-func (h *Httpr) Get(path string, opts ...*Opt) *Opt {
-	return h.DoRequest("GET", path, opts...)
-}
-
-// Post 发起一个Post请求
-func (h *Httpr) Post(path string, opts ...*Opt) *Opt {
-	return h.DoRequest("POST", path, opts...)
-}
-
-// Put 发起一个Put请求
-func (h *Httpr) Put(path string, opts ...*Opt) *Opt {
-	return h.DoRequest("PUT", path, opts...)
-}
-
-// Patch 发起一个Patch请求
-func (h *Httpr) Patch(path string, opts ...*Opt) *Opt {
-	return h.DoRequest("PATCH", path, opts...)
-}
-
-// Delete  发起一个Delete请求
-func (h *Httpr) Delete(path string, opts ...*Opt) *Opt {
-	return h.DoRequest("DELETE", path, opts...)
-}
-
-// NewHttpr 创建一个新的HTTP请求基类
-func NewHttpr(host, port string) (*Httpr, error) {
-	if host == "" || port == "" {
-		return nil, errors.New("host and port cannot be empty")
+	if opt.IsOK() && !opt.DisableMarshal {
+		// 响应体反序列化, 返回响应体
+		opt.Err = helper.JsonUnmarshal(opt.ResponseSteam, &opt.ResponseModel)
 	}
 
-	r := &Httpr{Host: host, Port: port, client: &http.Client{}, ctx: context.Background()}
-	r.SetTimeout(time.Second * 15)
+	return opt
+}
 
-	return r, nil
+// GetWithOption 发起一个Get请求
+func GetWithOption[T any](path string, opts ...*Opt[T]) *Opt[T] {
+	return DoRequest[T]("GET", path, opts...)
+}
+
+// PostWithOption 发起一个Post请求
+func PostWithOption[T any](path string, opts ...*Opt[T]) *Opt[T] {
+	return DoRequest[T]("POST", path, opts...)
+}
+
+// PutWithOption 发起一个Put请求
+func PutWithOption[T any](path string, opts ...*Opt[T]) *Opt[T] {
+	return DoRequest[T]("PUT", path, opts...)
+}
+
+// PatchWithOption 发起一个Patch请求
+func PatchWithOption[T any](path string, opts ...*Opt[T]) *Opt[T] {
+	return DoRequest[T]("PATCH", path, opts...)
+}
+
+// DeleteWithOption 发起一个Delete请求
+func DeleteWithOption[T any](path string, opts ...*Opt[T]) *Opt[T] {
+	return DoRequest[T]("DELETE", path, opts...)
+}
+
+func Get[T any](url string, query map[string]string) (T, error) {
+	opt := GetWithOption[T](url, &Opt[T]{Query: query, Url: url, DisableMarshal: false})
+	if opt.ErrorOccurred() {
+		return opt.ResponseModel, opt.Err
+	}
+
+	if !opt.IsOK() {
+		return opt.ResponseModel, fmt.Errorf("code: %d, resp: %s", opt.StatusCode, string(opt.ResponseSteam))
+	}
+
+	return opt.ResponseModel, nil
+}
+
+func Delete[T any](url string, query map[string]string) (T, error) {
+	opt := DeleteWithOption[T](url, &Opt[T]{Query: query, Url: url, DisableMarshal: false})
+	if opt.ErrorOccurred() {
+		return opt.ResponseModel, opt.Err
+	}
+	if !opt.IsOK() {
+		return opt.ResponseModel, fmt.Errorf("code: %d, resp: %s", opt.StatusCode, string(opt.ResponseSteam))
+	}
+
+	return opt.ResponseModel, nil
+}
+
+func Post[T any](url string, query map[string]string, req any) (T, error) {
+	opt := PostWithOption[T](url, &Opt[T]{Query: query, Url: url, DisableMarshal: false, RequestModel: req})
+	if opt.ErrorOccurred() {
+		return opt.ResponseModel, opt.Err
+	}
+	if !opt.IsOK() {
+		return opt.ResponseModel, fmt.Errorf("code: %d, resp: %s", opt.StatusCode, string(opt.ResponseSteam))
+	}
+
+	return opt.ResponseModel, nil
+}
+
+func Patch[T any](url string, query map[string]string, req any) (T, error) {
+	opt := PatchWithOption[T](url, &Opt[T]{Query: query, Url: url, DisableMarshal: false, RequestModel: req})
+	if opt.ErrorOccurred() {
+		return opt.ResponseModel, opt.Err
+	}
+	if !opt.IsOK() {
+		return opt.ResponseModel, fmt.Errorf("code: %d, resp: %s", opt.StatusCode, string(opt.ResponseSteam))
+	}
+
+	return opt.ResponseModel, nil
+}
+
+func Put[T any](url string, query map[string]string, req any) (T, error) {
+	opt := PutWithOption[T](url, &Opt[T]{Query: query, Url: url, DisableMarshal: false, RequestModel: req})
+	if opt.ErrorOccurred() {
+		return opt.ResponseModel, opt.Err
+	}
+	if !opt.IsOK() {
+		return opt.ResponseModel, fmt.Errorf("code: %d, resp: %s", opt.StatusCode, string(opt.ResponseSteam))
+	}
+
+	return opt.ResponseModel, nil
 }

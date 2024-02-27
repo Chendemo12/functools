@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.2.4 - (20240227)
+
+### Feat
+
+- 修改`logger`, `zaplog` , `httpc`
+
 ## 0.2.3 - (20231224)
 
 ### Feat

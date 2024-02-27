@@ -51,6 +51,7 @@ func init() {
 
 type Config struct {
 	Filename   string        `json:"filename,omitempty"` // 日志文件名，默认runtime
+	Filepath   string        `json:"filepath,omitempty"` // 日志路径，当此设置不存在时，会采用 Filename
 	Level      zapcore.Level `json:"level,omitempty"`    // 日志级别，默认warning
 	Rotation   int           `json:"rotation"`           // 单个日志文件的最大大小，单位MB
 	Retention  int           `json:"retention"`          // 单个日志的最大保存时间，单位Day
@@ -114,14 +115,18 @@ func GetLogger(filename string, deft ...bool) *zap.SugaredLogger {
 func newLogger(conf *Config) *zap.Logger {
 	// 设置日志级别
 	zapLevel := zap.NewAtomicLevelAt(conf.Level)
+	filepath := "./logs/" + conf.Filename + ".log"
+	if conf.Filepath != "" {
+		filepath = conf.Filepath
+	}
 	// 文件writeSyncer
 	fileWriteSyncer := zapcore.AddSync(
 		&lumberjack.Logger{
-			Filename:   "./logs/" + conf.Filename + ".log", // 日志文件存放目录
-			MaxSize:    conf.Rotation,                      // 文件大小限制,单位MB
-			MaxBackups: conf.MaxBackups,                    // 最大保留日志文件数量
-			MaxAge:     conf.Retention,                     // 日志文件保留天数
-			Compress:   conf.Compress,                      // 是否压缩处理
+			Filename:   filepath,        // 日志文件存放目录
+			MaxSize:    conf.Rotation,   // 文件大小限制,单位MB
+			MaxBackups: conf.MaxBackups, // 最大保留日志文件数量
+			MaxAge:     conf.Retention,  // 日志文件保留天数
+			Compress:   conf.Compress,   // 是否压缩处理
 		},
 	)
 
