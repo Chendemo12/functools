@@ -12,6 +12,9 @@ import (
 	"sync/atomic"
 )
 
+// MaxInitNum 内存最大初始化数量
+const MaxInitNum = 100
+
 var bufLength = int(math.Pow(2, 16) + headerLength) //
 
 var empty = make([]byte, 0)
@@ -156,9 +159,10 @@ func (s *Server) init() error {
 			byteOrder: s.byteOrder,
 			rxEnd:     headerLength,
 			txEnd:     headerLength,
-			rx:        make([]byte, bufLength),
-			tx:        make([]byte, bufLength),
-			lock:      &sync.Mutex{},
+			// TODO：
+			rx:   make([]byte, bufLength/4, bufLength),
+			tx:   make([]byte, bufLength/4, bufLength),
+			lock: &sync.Mutex{},
 		}
 	}
 
@@ -383,13 +387,14 @@ func (s *Server) process(r *Remote) {
 }
 
 type TcpsConfig struct {
-	MessageHandler HandlerFunc
-	Logger         logger.Iface
-	Host           string `json:"tcps_host"`
-	Port           string `json:"tcps_port"`
-	ByteOrder      string `json:"byte_order"`
-	MaxOpenConn    int    `json:"max_open_conn"`
-	IptableLimit   bool   `json:"iptable_limit"` // 是否开启IPTABLE限制
+	MessageHandler   HandlerFunc  `json:"-"`
+	Logger           logger.Iface `json:"-"`
+	Host             string       `json:"host,omitempty"`
+	Port             string       `json:"port,omitempty"`
+	ByteOrder        string       `json:"byteOrder,omitempty"`
+	MaxOpenConn      int          `json:"maxOpenConn,omitempty"`      // 最大连接数量，为0则不限制
+	IptableLimit     bool         `json:"iptableLimit,omitempty"`     // 是否开启IPTABLE限制
+	LazyInitDisabled bool         `json:"lazyInitDisabled,omitempty"` // 是否禁用延迟初始化，禁用延迟初始化后，程序将在启动时一次性的分配完连接内存（有最大数量限制）
 }
 
 // NewTcpServer 创建一个TCP server，此处未主动运行，需手动 Server.Start 启动服务
@@ -436,10 +441,6 @@ func NewTcpServer(c ...*TcpsConfig) *Server {
 
 	if s.logger == nil {
 		s.logger = logger.NewDefaultLogger()
-	}
-
-	if s.MaxOpenConnNums() == 0 {
-		s.SetMaxOpenConn(defaultMaxOpenConn)
 	}
 
 	return s
