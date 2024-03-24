@@ -109,16 +109,28 @@ func (r *Remote) RxFreeSize() int { return bufLength - r.rxEnd - 1 }
 
 // Write 将切片buf中的内容追加到发数据缓冲区内，并返回追加的数据长度;
 // 若缓冲区大小不足以写入全部数据，则返回实际写入的数据长度和错误消息
+// 涉及到了tx缓冲区的扩容
 func (r *Remote) Write(buf []byte) (int, error) {
 	r.lock.Lock() // 避免 HandlerFunc.OnAccepted 与 HandlerFunc.HandlerFunc 并发操作
 	defer r.lock.Unlock()
+
+	// 同理，发送缓冲区空间也不是一次性分配完的
+	needBufLength := len(buf)
+	if len(r.tx)-r.txEnd < needBufLength && len(r.tx) < bufLength { // 剩余空间不足，需要扩容 | 并且还有额外的空间可以使用
+		tn := bufLength - len(r.tx)
+		for tn/2 > needBufLength {
+			tn /= 2
+		}
+
+		r.tx = append(r.tx, make([]byte, tn)...)
+	}
 
 	i := copy(r.tx[r.txEnd:], buf)
 	r.txEnd += i // 更新未发送数据的结束下标
 
 	// Write must return a non-nil error if it returns n < len(p).
 	// Write must not modify the slice data, even temporarily.
-	if i < len(buf) {
+	if i < needBufLength {
 		return i, io.ErrShortWrite
 	}
 
@@ -155,7 +167,7 @@ func (r *Remote) Drain() error {
 	r.lock.Lock()
 	defer r.lock.Unlock() // 避免在 Drain 时 Write
 
-	if r.txEnd == headerLength {
+	if r.txEnd <= headerLength {
 		return nil // 没有需要发送的数据
 	}
 
@@ -168,7 +180,8 @@ func (r *Remote) Drain() error {
 }
 
 func (r *Remote) reset() {
-	r.conn, r.addr = nil, ""
+	r.conn = nil
+	r.addr = ""
 	r.lastRead = headerLength
 	r.rxEnd, r.txEnd = headerLength, headerLength // 重置游标
 	for i := 0; i < headerLength; i++ {
@@ -192,8 +205,11 @@ func (r *Remote) parseHeader() int {
 	}
 }
 
-// 从 net.Conn 中读取数据到缓冲区内
+// 从 net.Conn 中读取数据到缓冲区内, 涉及到了rx缓冲区的扩容
 func (r *Remote) readMessage() error {
+	// 首先清空读取缓冲区，令 Read 无法读取到数据
+	r.lastRead = headerLength
+	r.rxEnd = headerLength
 	// 获取消息长度
 	n, err := r.conn.Read(r.rx[0:headerLength])
 	if err != nil {
@@ -202,8 +218,20 @@ func (r *Remote) readMessage() error {
 	if n != headerLength {
 		return errors.New("the message header is incomplete")
 	}
+
 	// 接收数据
-	n, err = io.ReadFull(r.conn, r.rx[headerLength:r.parseHeader()+2]) // ReadFull 会把填充buf填满为止
+	needBufLength := r.parseHeader() + headerLength
+	if needBufLength > len(r.rx) {
+		// rx扩容; 由于内存空间的分配并非一次性分配到最大,而是逐渐增加的，但是一旦分配到了最大值，后续便不会触发分配
+
+		tn := bufLength - len(r.rx) // 剩余可以拿来分配的空间
+		for tn/2 > needBufLength {
+			tn /= 2
+		}
+
+		r.rx = append(r.rx, make([]byte, tn)...)
+	}
+	n, err = io.ReadFull(r.conn, r.rx[headerLength:needBufLength]) // ReadFull 会把buf填满为止
 
 	if err != nil {
 		return err

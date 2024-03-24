@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.2.5 - (20240323)
+
+### Feat
+
+- remove `cprint`, `kafkac`
+- 优化tcps，支持不受限制的TCP连接；
+
 ## 0.2.4 - (20240227)
 
 ### Feat
