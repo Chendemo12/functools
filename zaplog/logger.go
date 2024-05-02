@@ -21,16 +21,6 @@ const (
 	CRITICAL = zapcore.FatalLevel
 )
 
-const (
-	End   = "\u001B[0m"
-	EndLn = "\u001B[0m\n"
-	Ero   = "\u001B[31m"
-	Suc   = "\u001B[32m"
-	War   = "\u001B[33m"
-	Inf   = "\u001B[34m"
-	Deb   = "\u001B[35m" // 紫红色
-)
-
 var (
 	defaultConfig = &Config{
 		Filename:   "runtime",
@@ -40,13 +30,14 @@ var (
 		MaxBackups: 10,
 		Compress:   true,
 	}
-	instances     []*Config   // 存储全部日志句柄
-	defaultLogger *zap.Logger = nil
+	instances []*Config // 存储全部日志句柄
+	// 默认日志句柄
+	defaultLogger *zap.Logger        = nil
+	defaultSugar  *zap.SugaredLogger = nil
 )
 
 func init() {
-	defaultLogger = NewLogger(defaultConfig)
-	zap.ReplaceGlobals(defaultLogger) // 配置 zap 包的全局变量
+	Replace(CreateConsoleLogger())
 }
 
 type Config struct {
@@ -67,6 +58,7 @@ func (l *Config) Logger() *zap.Logger { return l.logger }
 func (l *Config) Sugar() *zap.SugaredLogger { return l.Logger().Sugar() }
 
 func (l *Config) ResetLevel(level zapcore.Level) *Config {
+	l.Level = level
 	return l
 }
 
@@ -155,3 +147,54 @@ func newLogger(conf *Config) *zap.Logger {
 
 	return zap.New(fileCore, zap.AddCaller()) // AddCaller()为显示文件名和行号
 }
+
+// Replace 替换默认日志句柄，同时替换zap包中的全局变量
+func Replace(logger *zap.Logger) {
+	if logger == nil {
+		return
+	}
+	defaultLogger = logger
+	defaultSugar = logger.Sugar()
+
+	Debug = defaultSugar.Debug
+	Info = defaultSugar.Info
+	Warn = defaultSugar.Warn
+	Error = defaultSugar.Error
+	Warnf = defaultSugar.Warnf
+	Errorf = defaultSugar.Errorf
+	Debugf = defaultSugar.Debugf
+
+	zap.ReplaceGlobals(logger) // 配置 zap 包的全局变量
+}
+
+// CreateConsoleLogger 创建一个输出到控制台的日志句柄，DEBUG输出级别
+func CreateConsoleLogger(level ...zapcore.Level) *zap.Logger {
+	zapLevel := zap.NewAtomicLevelAt(DEBUG)
+	if len(level) > 0 {
+		zapLevel = zap.NewAtomicLevelAt(level[0])
+	}
+
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(timeformat) // 指定时间格式
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder       // 设置彩色输出
+
+	fileCore := zapcore.NewCore(
+		// 获取编码器,NewJSONEncoder()输出json格式，NewConsoleEncoder()输出普通文本格式
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)),
+		// 第三个及之后的参数为写入文件的日志级别,ErrorLevel模式只记录error级别的日志
+		zapLevel,
+	)
+	return zap.New(fileCore, zap.AddCaller()) // AddCaller()为显示文件名和行号
+}
+
+var Info func(args ...any)
+var Debug func(args ...any)
+var Warn func(args ...any)
+var Error func(args ...any)
+
+var Errorf func(format string, v ...any)
+var Warnf func(format string, v ...any)
+var Debugf func(format string, v ...any)
+
+func Sync() error { return defaultLogger.Sync() }
